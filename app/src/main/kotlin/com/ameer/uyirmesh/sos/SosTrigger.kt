@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh.sos
 
+import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.Triggers
@@ -21,7 +22,7 @@ data class Countdown(val active: Boolean = false, val seconds: Int = 0, val trig
  * When the voice trigger fires, a 15-second voice note is recorded and sent after the SOS.
  */
 class SosTrigger(private val ctx: Context) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + CrashGuard)
     private var job: Job? = null
 
     private val _state = MutableStateFlow(Countdown())

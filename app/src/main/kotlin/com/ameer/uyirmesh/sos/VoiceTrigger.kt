@@ -1,6 +1,10 @@
 package com.ameer.uyirmesh.sos
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import com.ameer.uyirmesh.Graph
@@ -13,21 +17,23 @@ import org.vosk.LibVosk
 import org.vosk.LogLevel
 import org.vosk.Model
 import org.vosk.Recognizer
-import org.vosk.android.RecognitionListener
-import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
 
 /**
  * Offline "help help" detector (Vosk speech recognition, Indian English small model, runs on the phone).
  * The recogniser is limited to a tiny grammar so it only has to tell "help" apart from everything else.
  * Two "help"s in one utterance start the SOS countdown.
+ *
+ * The microphone loop is our own (not Vosk's SpeechService) so that a busy microphone, a phone call or an
+ * audio error never crashes the app: the loop stops and tries again later.
  */
 class VoiceTrigger(private val ctx: Context, private val onHelp: () -> Unit) {
     private val main = Handler(Looper.getMainLooper())
-    private var speech: SpeechService? = null
-    private var paused = false
-    private var stopped = true
+    @Volatile private var loop: ListenLoop? = null
+    @Volatile private var paused = false
+    @Volatile private var stopped = true
     private var lastFire = 0L
+    private val retry = Runnable { if (!stopped && !paused) model?.let { listen(it) } }
 
     fun start() {
         stopped = false
@@ -54,89 +60,81 @@ class VoiceTrigger(private val ctx: Context, private val onHelp: () -> Unit) {
         }
         loading = true
         _status.value = STATUS_LOADING
-        try {
-            LibVosk.setLogLevel(LogLevel.WARNINGS)
-            StorageService.unpack(ctx.applicationContext, "model", "model",
-                { loaded ->
+        val app = ctx.applicationContext
+        Thread({
+            try {
+                LibVosk.setLogLevel(LogLevel.WARNINGS)
+                val path = StorageService.sync(app, "model", "model")
+                val loaded = Model(path)
+                main.post {
                     loading = false
                     model = loaded
                     Graph.log("VOICE", "Speech model ready")
                     if (!stopped && !paused) listen(loaded)
-                },
-                { e ->
+                }
+            } catch (t: Throwable) {
+                main.post {
                     loading = false
                     _status.value = STATUS_ERROR
-                    Graph.log("VOICE", "Speech model failed: ${e.message}")
-                })
-        } catch (e: Throwable) {
-            loading = false
-            _status.value = STATUS_ERROR
-            Graph.log("VOICE", "Speech engine failed: ${e.message}")
-        }
+                    Graph.log("VOICE", "Speech model failed: ${t.javaClass.simpleName} ${t.message ?: ""}")
+                }
+            }
+        }, "voice-model").start()
     }
 
     private fun listen(m: Model) {
-        if (stopped || paused || speech != null) return
+        if (stopped || paused || loop != null) return
+        if (!Perms.hasMic(ctx)) {
+            _status.value = STATUS_NO_PERMISSION
+            return
+        }
+        val l = ListenLoop(m)
+        loop = l
+        l.start()
+    }
+
+    private fun stopLoop() {
+        val l = loop ?: return
+        loop = null
+        l.running = false
+        l.interrupt()
         try {
-            val rec = Recognizer(m, 16000f, GRAMMAR)
-            val s = SpeechService(rec, 16000f)
-            s.startListening(listener)
-            speech = s
-            _status.value = STATUS_LISTENING
-        } catch (e: Throwable) {
-            speech = null
-            _status.value = STATUS_MIC_BUSY
-            main.postDelayed({ if (!stopped && !paused) model?.let { listen(it) } }, 20_000)
+            l.join(1_500)
+        } catch (_: InterruptedException) {
         }
     }
 
-    private fun release() {
-        val s = speech ?: return
-        speech = null
-        try {
-            s.stop()
-        } catch (_: Throwable) {
-        }
-        try {
-            s.shutdown()
-        } catch (_: Throwable) {
-        }
-    }
-
-    /** Frees the microphone (for voice notes or calls). */
+    /** Frees the microphone (for voice notes). */
     fun pause() {
         paused = true
-        release()
+        main.removeCallbacks(retry)
+        stopLoop()
         if (!stopped) _status.value = STATUS_PAUSED
     }
 
     fun resume() {
         if (stopped) return
         paused = false
-        main.postDelayed({ model?.let { listen(it) } }, 500)
+        main.removeCallbacks(retry)
+        main.postDelayed(retry, 600)
     }
 
     fun stop() {
         stopped = true
-        release()
+        main.removeCallbacks(retry)
+        stopLoop()
         if (current === this) current = null
         _status.value = STATUS_OFF
     }
 
-    private val listener = object : RecognitionListener {
-        override fun onPartialResult(hypothesis: String?) = check(hypothesis, "partial")
-        override fun onResult(hypothesis: String?) = check(hypothesis, "text")
-        override fun onFinalResult(hypothesis: String?) = check(hypothesis, "text")
-
-        override fun onError(exception: Exception?) {
-            Graph.log("VOICE", "Recogniser error: ${exception?.message}")
-            release()
-            if (!stopped && !paused) main.postDelayed({ model?.let { listen(it) } }, 5_000)
-        }
-
-        override fun onTimeout() {
-            release()
-            if (!stopped && !paused) model?.let { listen(it) }
+    private fun onLoopEnded(l: ListenLoop, failed: Boolean) {
+        main.post {
+            if (loop === l) loop = null
+            if (failed && !stopped && !paused) {
+                _status.value = STATUS_MIC_BUSY
+                main.removeCallbacks(retry)
+                main.postDelayed(retry, 20_000)
+            }
         }
     }
 
@@ -159,7 +157,69 @@ class VoiceTrigger(private val ctx: Context, private val onHelp: () -> Unit) {
         }
     }
 
+    /** Reads 16 kHz audio and feeds it to the recogniser. Any failure ends the loop quietly. */
+    private inner class ListenLoop(private val m: Model) : Thread("voice-sos") {
+        @Volatile var running = true
+
+        @SuppressLint("MissingPermission")
+        override fun run() {
+            var record: AudioRecord? = null
+            var rec: Recognizer? = null
+            var failed = false
+            try {
+                rec = Recognizer(m, RATE.toFloat(), GRAMMAR)
+                val minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                val chunk = RATE / 5 // 0.2 s of samples
+                val bufBytes = maxOf(minBuf, chunk * 2) * 2
+                record = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes)
+                if (record.state != AudioRecord.STATE_INITIALIZED) {
+                    failed = true
+                    return
+                }
+                record.startRecording()
+                if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                    failed = true
+                    return
+                }
+                main.post { if (loop === this) _status.value = STATUS_LISTENING }
+                val buf = ShortArray(chunk)
+                while (running && !isInterrupted) {
+                    val n = record.read(buf, 0, buf.size)
+                    if (n < 0) {
+                        failed = true
+                        break
+                    }
+                    if (n == 0) continue
+                    if (rec.acceptWaveForm(buf, n)) {
+                        val r = rec.result
+                        main.post { check(r, "text") }
+                    } else {
+                        val p = rec.partialResult
+                        main.post { check(p, "partial") }
+                    }
+                }
+            } catch (t: Throwable) {
+                failed = true
+            } finally {
+                try {
+                    record?.stop()
+                } catch (_: Throwable) {
+                }
+                try {
+                    record?.release()
+                } catch (_: Throwable) {
+                }
+                try {
+                    rec?.close()
+                } catch (_: Throwable) {
+                }
+                onLoopEnded(this, failed && running)
+            }
+        }
+    }
+
     companion object {
+        private const val RATE = 16_000
         private const val GRAMMAR = "[\"help\", \"help help\", \"help me\", \"[unk]\"]"
         private val HELP = Regex("\\bhelp\\b")
 

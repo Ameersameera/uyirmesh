@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh.base
 
+import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.AckPayload
@@ -67,7 +68,7 @@ data class Hotspot(val center: LatLon, val count: Int, val radiusM: Double, val 
  * signed alerts, runs shelters, answers "is this person safe?" searches and serves the laptop dashboard.
  */
 class BaseBrain(private val ctx: Context) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
     private val store get() = Graph.store
     private val vault get() = Graph.vault
 

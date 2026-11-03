@@ -66,7 +66,7 @@ tr.row.sel { background: #ffe5e2; }
 .reason .lbl { width: 180px; }
 .timeline { font-size: 13px; }
 .timeline div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
-.timeline .t { color: var(--muted); display: inline-block; width: 52px; }
+.timeline .t { color: var(--muted); display: inline-block; width: 78px; }
 canvas { width: 100%; display: block; }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; margin-top: 6px; }
 .legend span::before { content: "●"; margin-right: 4px; color: var(--c); }
@@ -91,3 +91,5 @@ img.media { max-width: 100%; border-radius: 8px; margin: 4px 0; }
   .print-only { display: block; padding: 10px; }
   .print-only table { font-size: 11px; }
 }
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1f1b1a; color: #fff; padding: 10px 18px; border-radius: 10px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 10; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

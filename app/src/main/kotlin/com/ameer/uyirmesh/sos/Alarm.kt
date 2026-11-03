@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh.sos
 
+import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -30,7 +31,7 @@ import kotlin.math.sin
  * flashlight blinking SOS in Morse code, vibration patterns and countdown beeps.
  */
 class Alarm(private val ctx: Context) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
     private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private val _siren = MutableStateFlow(false)

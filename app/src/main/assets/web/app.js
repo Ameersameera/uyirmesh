@@ -35,6 +35,15 @@ function dist(lat1, lon1, lat2, lon2) {
 }
 const fmtDist = (m) => (m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(m < 10000 ? 1 : 0) + " km");
 
+function toast(text) {
+  let t = $("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
+  t.textContent = text;
+  t.className = "show";
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { t.className = ""; }, 2600);
+}
+
 async function api(path, body) {
   const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" } : { credentials: "same-origin" };
   const r = await fetch(path, opts);
@@ -66,7 +75,7 @@ $("loginForm").addEventListener("submit", async (e) => {
 
 $("logoutBtn").addEventListener("click", async () => { try { await api("/api/logout"); } catch (e) {} showLogin(); });
 $("printBtn").addEventListener("click", printReport);
-$("autoAssign").addEventListener("change", (e) => api("/api/autoassign", { on: e.target.checked }).then(refresh));
+$("autoAssign").addEventListener("change", (e) => api("/api/autoassign", { on: e.target.checked }).then(() => { toast(e.target.checked ? "Auto-assign on" : "Auto-assign off"); refresh(); }));
 
 function start() {
   $("login").classList.add("hidden");
@@ -363,7 +372,9 @@ function drawTopology(canvas) {
     ctx.beginPath(); ctx.arc(p.x, p.y, 18, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
     const n = nodes.find((x) => x.id === id);
     ctx.fillStyle = "#222"; ctx.font = "14px sans-serif";
-    ctx.fillText((n && n.name ? n.name : id.substring(0, 6)) + (n && n.battery >= 0 ? " " + n.battery + "%" : ""), p.x + 22, p.y + 5);
+    ctx.textAlign = "center";
+    ctx.fillText((n && n.name ? n.name : id.substring(0, 6)) + (n && n.battery >= 0 ? " " + n.battery + "%" : ""), p.x, p.y - 26);
+    ctx.textAlign = "start";
   });
   if (!ids.length) { ctx.fillStyle = "#6b6261"; ctx.font = "18px sans-serif"; ctx.fillText("Waiting for heartbeats from phones…", 40, H / 2); }
 }
@@ -487,10 +498,10 @@ function renderLog() {
 
 function bindAfterRender() {
   document.querySelectorAll("tr.row").forEach((tr) => tr.addEventListener("click", () => { selected = tr.dataset.case; render(); }));
-  document.querySelectorAll("[data-assign]").forEach((b) => b.addEventListener("click", () => api("/api/assign", { caseId: selected, team: b.dataset.assign }).then(refresh)));
-  document.querySelectorAll("[data-status]").forEach((b) => b.addEventListener("click", () => api("/api/status", { caseId: selected, status: b.dataset.status }).then(refresh)));
+  document.querySelectorAll("[data-assign]").forEach((b) => b.addEventListener("click", () => api("/api/assign", { caseId: selected, team: b.dataset.assign }).then(() => { toast("Assigned to team " + b.dataset.assign + " - task sent"); refresh(); })));
+  document.querySelectorAll("[data-status]").forEach((b) => b.addEventListener("click", () => api("/api/status", { caseId: selected, status: b.dataset.status }).then(() => { toast("Status updated - victim informed"); refresh(); })));
   const ms = $("msgSend");
-  if (ms) ms.addEventListener("click", () => { const t = $("msgText").value.trim(); if (t) api("/api/message", { caseId: selected, text: t }).then(() => { $("msgText").value = ""; refresh(); }); });
+  if (ms) ms.addEventListener("click", () => { const t = $("msgText").value.trim(); if (t) api("/api/message", { caseId: selected, text: t }).then(() => { $("msgText").value = ""; document.activeElement.blur(); toast("Signed message sent to the victim"); refresh(); }); });
   const map = $("map");
   if (map) {
     drawMapIfAny();
@@ -528,15 +539,15 @@ function bindAfterRender() {
   if (as) as.addEventListener("click", () => {
     const body = { kind: $("aKind").value, title: $("aTitle").value.trim(), message: $("aMsg").value.trim(), severity: Number($("aSev").value), useLocation: $("aLoc").checked, radius: Number($("aRadius").value), validMinutes: Number($("aValid").value) };
     if (!body.title) { $("aResult").textContent = "Title is required"; return; }
-    api("/api/alert", body).then(() => { $("aResult").textContent = "Signed alert sent ✓"; $("aTitle").value = ""; $("aMsg").value = ""; setTimeout(refresh, 300); });
+    api("/api/alert", body).then(() => { toast("Signed alert sent ✓"); $("aTitle").value = ""; $("aMsg").value = ""; document.activeElement.blur(); setTimeout(refresh, 300); });
   });
   const cs = $("chatSend");
-  if (cs) cs.addEventListener("click", () => { const t = $("chatText").value.trim(); chatTeam = $("chatTeam").value; if (t && chatTeam) api("/api/teamchat", { team: chatTeam, text: t }).then(() => { $("chatText").value = ""; refresh(); }); });
+  if (cs) cs.addEventListener("click", () => { const t = $("chatText").value.trim(); chatTeam = $("chatTeam").value; if (t && chatTeam) api("/api/teamchat", { team: chatTeam, text: t }).then(() => { $("chatText").value = ""; document.activeElement.blur(); toast("Encrypted message sent to " + chatTeam); refresh(); }); });
   const sa = $("shAdd");
-  if (sa) sa.addEventListener("click", () => { const n = $("shName").value.trim(); if (n) api("/api/shelter", { name: n, capacity: Number($("shCap").value) || 100 }).then(() => { $("shName").value = ""; refresh(); }); });
+  if (sa) sa.addEventListener("click", () => { const n = $("shName").value.trim(); if (n) api("/api/shelter", { name: n, capacity: Number($("shCap").value) || 100 }).then(() => { $("shName").value = ""; document.activeElement.blur(); toast("Shelter added and announced"); refresh(); }); });
   document.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", () => {
     const id = b.dataset.save; const v = (k) => Number(document.querySelector(`[data-sup="${k}"][data-id="${id}"]`).value) || 0;
-    api("/api/supplies", { id, water: v("water"), food: v("food"), medicine: v("medicine"), capacity: Number(b.dataset.cap) }).then(refresh);
+    api("/api/supplies", { id, water: v("water"), food: v("food"), medicine: v("medicine"), capacity: Number(b.dataset.cap) }).then(() => { toast("Supplies saved and announced"); refresh(); });
   }));
   const pq = $("pq");
   if (pq) pq.addEventListener("input", () => { $("pres").innerHTML = searchPeople(pq.value); });

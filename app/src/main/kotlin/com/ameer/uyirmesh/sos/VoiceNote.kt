@@ -21,6 +21,7 @@ object VoiceNote {
     private var file: File? = null
     private var startedAt = 0L
     private var onFinished: ((Boolean) -> Unit)? = null
+    private var waitedForMic = false
 
     private val _seconds = MutableStateFlow(-1)
     /** Seconds recorded so far, or -1 when not recording. */
@@ -47,7 +48,15 @@ object VoiceNote {
             done?.invoke(false)
             return
         }
-        VoiceTrigger.current?.pause()
+        val voice = VoiceTrigger.current
+        if (voice != null && !waitedForMic) {
+            // Free the microphone first, then start recording a moment later.
+            voice.pause()
+            waitedForMic = true
+            main.postDelayed({ start(ctx, maxSeconds, done) }, 500)
+            return
+        }
+        waitedForMic = false
         val f = File(ctx.cacheDir, "voice_${System.currentTimeMillis()}.amr")
         @Suppress("DEPRECATION")
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(ctx) else MediaRecorder()

@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh.sos
 
+import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.AckPayload
@@ -47,7 +48,7 @@ data class SosForm(
  * replies from the base and rescuers that make up the status timeline.
  */
 class Victim(private val ctx: Context) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
     private val store get() = Graph.store
     private var lastSosAt = 0L
 

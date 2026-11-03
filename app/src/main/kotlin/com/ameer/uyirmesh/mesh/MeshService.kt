@@ -42,15 +42,31 @@ class MeshService : LifecycleService() {
         lifecycleScope.launch {
             combine(Graph.mesh.stats, Graph.prefs.settings) { st, s -> Triple(st.peers, st.waitingOwn, s.role) }
                 .distinctUntilChanged()
-                .collect { (peers, waiting, role) -> updateNotification(peers, waiting, role) }
+                .collect { (peers, waiting, role) ->
+                    try {
+                        updateNotification(peers, waiting, role)
+                    } catch (e: Exception) {
+                        Graph.note("notification", e)
+                    }
+                }
         }
         lifecycleScope.launch {
-            Graph.prefs.settings.collect { applySettings() }
+            Graph.prefs.settings.collect {
+                try {
+                    applySettings()
+                } catch (e: Exception) {
+                    Graph.note("apply settings", e)
+                }
+            }
         }
         lifecycleScope.launch {
             while (true) {
                 delay(60_000)
-                Graph.base.webServerCheck()
+                try {
+                    Graph.base.webServerCheck()
+                } catch (e: Exception) {
+                    Graph.note("web check", e)
+                }
             }
         }
     }

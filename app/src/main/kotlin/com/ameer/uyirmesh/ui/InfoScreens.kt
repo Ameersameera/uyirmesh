@@ -212,6 +212,7 @@ fun NetworkScreen(nav: Nav) {
             }
             SectionTitle(tr("nearby_phones"))
             if (peers.isEmpty()) Text(tr("no_peers_hint"), style = MaterialTheme.typography.bodySmall)
+            var blockTick by remember { mutableIntStateOf(0) }
             for (p in peers) {
                 InfoCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -221,9 +222,30 @@ fun NetworkScreen(nav: Nav) {
                             Text("${p.deviceId.take(8)} · ${roleName(roleOf(p.role))}", fontWeight = FontWeight.SemiBold)
                             Text("${tr("connected_for")} ${agoText(p.since)}", style = MaterialTheme.typography.bodySmall)
                         }
+                        TonalButton(tr("block_demo")) {
+                            Graph.mesh.setBlocked(p.deviceId, true)
+                            blockTick++
+                        }
                     }
                 }
             }
+            val blocked = remember(peers, blockTick) { Graph.mesh.blockedPeers() }
+            if (blocked.isNotEmpty()) {
+                SectionTitle(tr("blocked_links"))
+                Text(tr("blocked_links_sub"), style = MaterialTheme.typography.bodySmall)
+                for (b in blocked) {
+                    InfoCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(b.take(8), Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            TonalButton(tr("unblock")) {
+                                Graph.mesh.setBlocked(b, false)
+                                blockTick++
+                            }
+                        }
+                    }
+                }
+            }
+            Text(tr("block_demo_note"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SectionTitle(tr("packet_counters"))
             InfoCard {
                 for ((k, v) in m) KeyValue(counterName(k), v.toString())

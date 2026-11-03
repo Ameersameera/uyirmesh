@@ -40,6 +40,15 @@ import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
+/** Releases the camera without blocking the screen if the camera never finished starting. */
+private fun unbindCamera(ctx: android.content.Context) {
+    try {
+        val f = ProcessCameraProvider.getInstance(ctx)
+        if (f.isDone) f.get().unbindAll() else f.addListener({ try { f.get().unbindAll() } catch (_: Exception) {} }, ContextCompat.getMainExecutor(ctx))
+    } catch (_: Exception) {
+    }
+}
+
 object Qr {
     /** Black-on-white QR bitmap, one pixel per module (scaled up without smoothing when drawn). */
     fun bitmap(text: String): Bitmap {
@@ -48,7 +57,11 @@ object Qr {
             EncodeHintType.MARGIN to 2,
             EncodeHintType.CHARACTER_SET to "UTF-8",
         )
-        val m = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 0, 0, hints)
+        val m = try {
+            QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 0, 0, hints)
+        } catch (e: Exception) {
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        }
         val w = m.width
         val h = m.height
         val px = IntArray(w * h)
@@ -77,10 +90,7 @@ fun QrScanner(modifier: Modifier = Modifier, onResult: (String) -> Unit) {
     }
     DisposableEffect(Unit) {
         onDispose {
-            try {
-                ProcessCameraProvider.getInstance(ctx).get().unbindAll()
-            } catch (_: Exception) {
-            }
+            unbindCamera(ctx)
             executor.shutdown()
         }
     }
@@ -154,12 +164,7 @@ fun CameraPreview(modifier: Modifier, holder: PhotoCapture) {
     val owner = LocalLifecycleOwner.current
     val ctx = LocalContext.current
     DisposableEffect(Unit) {
-        onDispose {
-            try {
-                ProcessCameraProvider.getInstance(ctx).get().unbindAll()
-            } catch (_: Exception) {
-            }
-        }
+        onDispose { unbindCamera(ctx) }
     }
     Box(modifier) {
         AndroidView(

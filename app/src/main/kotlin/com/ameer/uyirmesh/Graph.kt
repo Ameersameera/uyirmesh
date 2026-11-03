@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh
 
+import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import com.ameer.uyirmesh.base.BaseBrain
 import com.ameer.uyirmesh.core.PinnedBaseKeys
@@ -53,7 +54,7 @@ object Graph {
     lateinit var alarm: Alarm
         private set
 
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
 
     private val _peerCount = MutableStateFlow(0)
     val peerCount: StateFlow<Int> = _peerCount

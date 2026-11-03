@@ -17,16 +17,24 @@ import androidx.core.content.ContextCompat
 /** Which runtime permissions each feature needs on this Android version. */
 object Perms {
 
-    /** Needed by Google Nearby Connections to advertise, discover and connect. */
+    /**
+     * Needed by Google Nearby Connections to advertise, discover and connect (per Android version, as in
+     * Google's Nearby Connections setup guide): location up to Android 12L, Bluetooth permissions from
+     * Android 12, nearby Wi-Fi devices from Android 13.
+     */
     fun mesh(): List<String> = buildList {
         if (Build.VERSION.SDK_INT >= 31) {
             add(Manifest.permission.BLUETOOTH_SCAN)
             add(Manifest.permission.BLUETOOTH_ADVERTISE)
             add(Manifest.permission.BLUETOOTH_CONNECT)
         }
-        if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
-        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (Build.VERSION.SDK_INT >= 33) {
+            add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        } else if (Build.VERSION.SDK_INT >= 29) {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
     }
 
     fun location(): List<String> = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -38,7 +46,7 @@ object Perms {
     const val CAMERA = Manifest.permission.CAMERA
 
     /** Everything asked for during setup (the camera is asked for only when it is used). */
-    fun setup(): List<String> = (mesh() + notifications() + MIC).distinct()
+    fun setup(): List<String> = (mesh() + location() + notifications() + MIC).distinct()
 
     fun has(ctx: Context, p: String): Boolean =
         ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED

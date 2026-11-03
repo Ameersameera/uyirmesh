@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh.mesh
 
+import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -46,7 +47,7 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
     val link = NearbyLink(ctx, myId, { roleChar() }, this)
 
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "mesh-worker") }.asCoroutineDispatcher()
-    private val scope = CoroutineScope(SupervisorJob() + worker)
+    private val scope = CoroutineScope(SupervisorJob() + worker + CrashGuard)
     private var loops: Job? = null
 
     private val _peers = MutableStateFlow<List<NearbyLink.Peer>>(emptyList())
@@ -85,6 +86,20 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
         outbox.ttl = s.ttl
         outbox.drill = s.drill
         link.lowPower = s.batterySaver
+        val blocked = blockedPeers()
+        if (blocked != link.blocked) link.blocked = blocked
+    }
+
+    fun blockedPeers(): Set<String> =
+        (Graph.prefs.getString("blockedPeers") ?: "").split(',').filter { it.length == 16 }.toSet()
+
+    /** Demo helper: refuse (or allow again) the direct radio link to one phone. */
+    fun setBlocked(deviceId: String, block: Boolean) {
+        val set = blockedPeers().toMutableSet()
+        if (block) set.add(deviceId) else set.remove(deviceId)
+        Graph.prefs.putString("blockedPeers", set.joinToString(","))
+        link.blocked = set
+        Graph.log("LINK", (if (block) "Blocked" else "Allowed") + " direct link to ${deviceId.take(6)}")
     }
 
     fun onRoleChanged() {
@@ -123,9 +138,13 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
     private suspend fun tickLoop() {
         var n = 0
         while (true) {
-            val out = engine.tick()
-            for (s in out) link.send(s.neighbour, s.bytes, s.packet.idHex)
-            if (n++ % 4 == 0) publishStats()
+            try {
+                val out = engine.tick()
+                for (s in out) link.send(s.neighbour, s.bytes, s.packet.idHex)
+                if (n++ % 4 == 0) publishStats()
+            } catch (e: Exception) {
+                Graph.note("mesh tick", e)
+            }
             val wait = if (kick) 50L else 250L
             kick = false
             delay(wait)
@@ -207,7 +226,12 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
 
     override fun onBytes(fromDevice: String, bytes: ByteArray) {
         scope.launch {
-            val r = engine.receive(fromDevice, bytes)
+            val r = try {
+                engine.receive(fromDevice, bytes)
+            } catch (e: Exception) {
+                Graph.note("mesh receive", e)
+                return@launch
+            }
             if (r.forwarded) kick = true
             val p = r.packet
             if (r.drop != null) {

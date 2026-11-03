@@ -62,6 +62,20 @@ class NearbyLink(
         private set
     @Volatile var lowPower = false
 
+    /** Phones this phone refuses to link with (used to show multi-hop relaying in a small room). */
+    @Volatile var blocked: Set<String> = emptySet()
+        set(value) {
+            field = value
+            for (p in peers.values.filter { it.deviceId in value }) {
+                try {
+                    client.disconnectFromEndpoint(p.endpointId)
+                } catch (_: Exception) {
+                }
+                peers.remove(p.endpointId)
+            }
+            listener.onPeersChanged(peerList())
+        }
+
     private var lastAdvertiseTry = 0L
     private var lastDiscoveryTry = 0L
     private var discoveryStartedAt = 0L
@@ -177,6 +191,7 @@ class NearbyLink(
         if (!running) return
         if (peers.containsKey(endpointId) || pending.containsKey(endpointId)) return
         if (peers.values.any { it.deviceId == dev }) return
+        if (dev in blocked) return
         if (peers.size >= MAX_PEERS) return
         if (now() < (nextTry[dev] ?: 0L)) return
         if (fresh && myId > dev) {
@@ -204,7 +219,7 @@ class NearbyLink(
     private val lifecycle = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             val dev = parseDevice(info.endpointName)
-            if (dev == null || dev == myId || peers.values.any { it.deviceId == dev }) {
+            if (dev == null || dev == myId || dev in blocked || peers.values.any { it.deviceId == dev }) {
                 try {
                     client.rejectConnection(endpointId)
                 } catch (_: Exception) {
