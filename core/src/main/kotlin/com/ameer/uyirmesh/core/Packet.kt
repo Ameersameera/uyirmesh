@@ -23,7 +23,8 @@ enum class PacketType(val code: Int, val qos: Int) {
     TASK_STATUS(13, 1),
     TEAM_CHAT(14, 2),
     FIND_REQUEST(15, 2),
-    FIND_RESULT(16, 1);
+    FIND_RESULT(16, 1),
+    MISSING(17, 2);
 
     companion object {
         private val byCode = entries.associateBy { it.code }

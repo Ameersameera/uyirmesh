@@ -479,6 +479,39 @@ data class FindResult(val requestId: String, val query: String, val matches: Lis
     }
 }
 
+/** Missing-person notice shown on every phone's board; [found] = true closes it. */
+data class MissingPayload(
+    val noticeId: String,
+    val person: String,
+    val age: Int,
+    val description: String,
+    val lastSeen: String,
+    val contact: String,
+    val reporter: String,
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val found: Boolean = false,
+    val at: Long = 0,
+) {
+    fun toBytes(): ByteArray = Json.toBytes(
+        linkedMapOf(
+            "i" to noticeId, "p" to person, "ag" to age, "de" to description, "ls" to lastSeen, "ct" to contact,
+            "rp" to reporter, "la" to lat.r6(), "lo" to lon.r6(), "f" to found, "t" to at,
+        )
+    )
+
+    companion object {
+        fun fromBytes(b: ByteArray): MissingPayload {
+            val m = Json.objectFromBytes(b)
+            return MissingPayload(
+                m.str("i"), m.str("p").take(60), m.int("ag", -1), m.str("de").take(300), m.str("ls").take(120),
+                m.str("ct").take(30), m.str("rp").take(60), m.doubleOrNull("la"), m.doubleOrNull("lo"), m.bool("f"),
+                m.long("t"),
+            )
+        }
+    }
+}
+
 /** Personal medical card, shown as a QR code that a rescuer or shelter can scan (never sent over the mesh by itself). */
 data class ProfileCard(
     val deviceId: String,

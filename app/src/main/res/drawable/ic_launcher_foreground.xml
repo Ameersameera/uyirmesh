@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Mesh links -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,33 L35,68 M54,33 L73,68 M35,68 L73,68" />
+    <!-- Nodes -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,33m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,68m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M73,68m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <!-- Medical cross in the middle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,46h6v6h6v6h-6v6h-6v-6h-6v-6h6z" />
+</vector>

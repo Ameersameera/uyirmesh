@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UyirMesh</string>
+    <string name="widget_label">UyirMesh SOS</string>
+    <string name="widget_description">One tap SOS. Sends after a 5 second countdown.</string>
+    <string name="tile_label">SOS</string>
+    <string name="shortcut_sos_short">SOS</string>
+    <string name="shortcut_sos_long">Send SOS now</string>
+    <string name="shortcut_safe_short">I\'m safe</string>
+    <string name="shortcut_safe_long">Tell everyone I\'m safe</string>
+</resources>

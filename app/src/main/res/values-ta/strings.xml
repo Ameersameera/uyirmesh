@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label">உயிர்மெஷ் SOS</string>
+    <string name="widget_description">ஒரே தொடுதலில் SOS. 5 வினாடி கவுண்ட்டவுனுக்குப் பிறகு அனுப்பும்.</string>
+    <string name="tile_label">SOS</string>
+    <string name="shortcut_sos_short">SOS</string>
+    <string name="shortcut_sos_long">இப்போதே SOS அனுப்பு</string>
+    <string name="shortcut_safe_short">நான் பாதுகாப்பாக உள்ளேன்</string>
+    <string name="shortcut_safe_long">நான் பாதுகாப்பாக உள்ளேன் என்று அனைவருக்கும் சொல்</string>
+</resources>

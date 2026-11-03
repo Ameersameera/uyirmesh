@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_sos"
+        android:shortcutId="sos"
+        android:shortcutLongLabel="@string/shortcut_sos_long"
+        android:shortcutShortLabel="@string/shortcut_sos_short">
+        <intent
+            android:action="com.ameer.uyirmesh.action.SOS"
+            android:targetClass="com.ameer.uyirmesh.SosActivity"
+            android:targetPackage="com.ameer.uyirmesh">
+            <extra android:name="trigger" android:value="SHORTCUT" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_safe"
+        android:shortcutId="safe"
+        android:shortcutLongLabel="@string/shortcut_safe_long"
+        android:shortcutShortLabel="@string/shortcut_safe_short">
+        <intent
+            android:action="com.ameer.uyirmesh.action.SAFE"
+            android:targetClass="com.ameer.uyirmesh.MainActivity"
+            android:targetPackage="com.ameer.uyirmesh" />
+    </shortcut>
+</shortcuts>

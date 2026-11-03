@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UyirMesh Base Dashboard</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="login" class="login hidden">
+  <div class="login-card">
+    <div class="logo">⛑</div>
+    <h1>UyirMesh</h1>
+    <p class="muted">Rescue base dashboard · works on the base phone's hotspot, no internet</p>
+    <form id="loginForm">
+      <input id="password" type="password" placeholder="Base password" autocomplete="current-password" required>
+      <button type="submit">Log in</button>
+      <div id="loginError" class="error"></div>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="brand"><span class="logo-sm">⛑</span> <b id="baseName">UyirMesh</b> <span id="drillBadge" class="badge grey hidden">DRILL</span></div>
+    <div class="stats" id="headStats"></div>
+    <div class="head-actions">
+      <label class="toggle"><input type="checkbox" id="autoAssign"> Auto-assign</label>
+      <a class="btn small" href="/api/export.csv">CSV</a>
+      <button class="btn small" id="printBtn">Print report</button>
+      <button class="btn small ghost" id="logoutBtn">Log out</button>
+    </div>
+  </header>
+  <nav id="tabs"></nav>
+  <main id="main"></main>
+  <footer><span id="updated">-</span> · <span id="fingerprint"></span></footer>
+</div>
+
+<div id="printArea" class="print-only"></div>
+<script src="/app.js"></script>
+</body>
+</html>
