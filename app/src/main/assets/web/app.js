@@ -35,6 +35,35 @@ function dist(lat1, lon1, lat2, lon2) {
 }
 const fmtDist = (m) => (m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(m < 10000 ? 1 : 0) + " km");
 
+/* Google Maps link (needs internet on the laptop; the coordinates are in the link either way). */
+function gmLink(lat, lon, text) {
+  if (lat == null || lon == null) return "";
+  return `<a href="https://maps.google.com/?q=${lat.toFixed(6)},${lon.toFixed(6)}" target="_blank" rel="noopener">${esc(text || "Open in Google Maps")} &#8599;</a>`;
+}
+
+const TREND = {
+  CLOSER: ["Getting closer", "green"], ARRIVED: ["Reached the victim", "green"], SAME: ["Moving, distance about the same", "amber"],
+  STILL: ["Not moving", "orange"], AWAY: ["Moving away", "red"], UNKNOWN: ["Waiting for the next position", "grey"],
+};
+
+/* Is each rescuer of the assigned team really on the way? (positions signed with the team key) */
+function trackingHtml(c) {
+  if (!c.team || !["ASSIGNED", "ON_THE_WAY"].includes(c.status)) return "";
+  const head = `<h3>Rescue team tracking · team ${esc(c.team)}</h3>`;
+  if (c.lat == null) return head + '<div class="muted">The victim\'s GPS position is not known yet, so the distance cannot be worked out.</div>';
+  const rows = (c.tracking || []).map((t) => {
+    const [label, cls] = TREND[t.trend] || [t.trend, "grey"];
+    const still = t.trend === "STILL" ? " for " + t.stillMin + " min" : "";
+    const ageMin = Math.round((Date.now() - t.at) / 60000);
+    const old = ageMin >= 5 ? ` <span class="badge orange">no new position for ${ageMin} min</span>` : "";
+    const earlier = t.earlier != null && t.trend !== "UNKNOWN" ? `<div class="muted">Was ${fmtDist(t.earlier)} away ${t.overMin} min earlier</div>` : "";
+    return `<div class="track"><b>${esc(t.rescuer)}</b> <span class="badge ${cls}">${label}${still}</span>${old}
+      <div class="big">${fmtDist(t.distance)} from the victim</div>${earlier}
+      <div class="muted">${t.eta > 0 ? "ETA " + t.eta + " min · " : ""}position ${ago(t.at)}${t.battery >= 0 ? " · battery " + t.battery + "%" : ""} · ${gmLink(t.lat, t.lon, "rescuer on Google Maps")}</div></div>`;
+  }).join("") || `<div class="muted">No position from team ${esc(c.team)} yet. Rescuer phones send their position about once a minute while they are in the mesh.</div>`;
+  return head + rows + '<div class="muted">Rescuer positions are signed with the team key, so nobody else can fake them.</div>';
+}
+
 function toast(text) {
   let t = $("toast");
   if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
@@ -171,12 +200,13 @@ function renderDetail() {
       <div>Name</div><div>${esc(c.name) || "-"}</div><div>Phone</div><div>${esc(c.phone) || "-"}</div>
       <div>Blood</div><div>${esc(c.blood) || "-"}</div><div>Medical</div><div style="color:#d32f2f">${esc(c.medical) || "-"}</div>
       <div>Battery</div><div>${c.battery >= 0 ? c.battery + "%" : "?"}${c.lowBattery ? " (last position)" : ""}</div>
-      <div>Location</div><div>${c.lat != null ? c.lat.toFixed(5) + ", " + c.lon.toFixed(5) + " ±" + Math.round(c.accuracy || 0) + " m" : "no GPS yet"}</div>
+      <div>Location</div><div>${c.lat != null ? c.lat.toFixed(5) + ", " + c.lon.toFixed(5) + " ±" + Math.round(c.accuracy || 0) + " m · " + gmLink(c.lat, c.lon) : "no GPS yet"}</div>
       <div>Sent by</div><div>${esc(c.trigger.toLowerCase())} · ${c.repeats + 1} time(s)</div>
       <div>Packet path</div><div>${esc(path)} (${c.hops} hops)</div>
       ${c.note ? `<div>Note</div><div>"${esc(c.note)}"</div>` : ""}
     </div>
     ${media ? "<h3>Voice notes and photos</h3>" + media : ""}
+    ${trackingHtml(c)}
     <h3>Assign team</h3><div class="row-actions">${teams}</div>
     <h3>Status</h3><div class="row-actions">
       <button class="small orange" data-status="ON_THE_WAY">On the way</button>
@@ -257,9 +287,16 @@ function drawMap(canvas, opts) {
     ctx.fillStyle = "#00695c"; ctx.font = "14px sans-serif"; ctx.fillText(s.name + " " + s.occupancy + "/" + s.capacity, x + 14, y + 5);
   }
   for (const r of rescuers) {
+    const trail = (r.trail || []).filter((p) => Date.now() - p[2] < 30 * 60000);
+    if (trail.length > 1) {
+      ctx.strokeStyle = "rgba(21,101,192,.55)"; ctx.lineWidth = 3; ctx.beginPath();
+      trail.forEach((p, i) => { const [tx, ty] = proj(p[0], p[1]); if (i) ctx.lineTo(tx, ty); else ctx.moveTo(tx, ty); }); ctx.stroke();
+    }
+  }
+  for (const r of rescuers) {
     const [x, y] = proj(r.lat, r.lon);
     ctx.fillStyle = "#1565c0"; ctx.fillRect(x - 9, y - 9, 18, 18); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(x - 9, y - 9, 18, 18);
-    ctx.fillStyle = "#0d47a1"; ctx.font = "13px sans-serif"; ctx.fillText(r.team, x + 12, y + 4);
+    ctx.fillStyle = "#0d47a1"; ctx.font = "13px sans-serif"; ctx.fillText(r.name + " · " + r.team, x + 12, y + 4);
   }
   for (const c of visibleCases) {
     const [x, y] = proj(c.lat, c.lon);
@@ -292,7 +329,7 @@ function renderTeams() {
   S.rescuers.forEach((r) => { (groups[r.team] = groups[r.team] || []).push(r); });
   const html = Object.keys(groups).sort().map((t) => {
     const active = S.cases.filter((c) => c.team === t && (c.status === "ASSIGNED" || c.status === "ON_THE_WAY")).length;
-    const rows = groups[t].map((r) => `<tr><td>${esc(r.name)}</td><td>${r.lastSeen ? ago(r.lastSeen) : "not seen yet"}</td><td>${r.battery >= 0 ? r.battery + "%" : "-"}</td><td>${r.lat != null ? r.lat.toFixed(4) + ", " + r.lon.toFixed(4) : "-"}</td><td>${fmtDateTime(r.expiresAt)}</td></tr>`).join("");
+    const rows = groups[t].map((r) => `<tr><td>${esc(r.name)}</td><td>${r.lastSeen ? ago(r.lastSeen) : "not seen yet"}</td><td>${r.battery >= 0 ? r.battery + "%" : "-"}</td><td>${r.lat != null ? r.lat.toFixed(4) + ", " + r.lon.toFixed(4) + " · " + ago(r.posAt || r.lastSeen) + " · " + gmLink(r.lat, r.lon, "map") : "-"}</td><td>${fmtDateTime(r.expiresAt)}</td></tr>`).join("");
     return `<h3>Team ${esc(t)} · ${active} active task(s)</h3><table><tr><th>Rescuer</th><th>Last seen</th><th>Battery</th><th>Position</th><th>ID valid until</th></tr>${rows}</table>`;
   }).join("") || '<div class="empty">No rescuers yet. Add rescuers on the base phone (Teams > Add rescuer).</div>';
   if (!chatTeam && S.teams.length) chatTeam = S.teams[0];

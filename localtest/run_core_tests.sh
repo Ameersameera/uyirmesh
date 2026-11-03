@@ -17,4 +17,5 @@ java -cp "$CP" Runner \
   com.ameer.uyirmesh.core.PacketCryptoTest \
   com.ameer.uyirmesh.core.MeshEngineTest \
   com.ameer.uyirmesh.core.KeysSecureTest \
-  com.ameer.uyirmesh.core.GeoPriorityPayloadTest 2>&1 | grep -v "^Picked up"
+  com.ameer.uyirmesh.core.GeoPriorityPayloadTest \
+  com.ameer.uyirmesh.core.TrackingTest 2>&1 | grep -v "^Picked up"

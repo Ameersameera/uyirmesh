@@ -5,15 +5,18 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import androidx.annotation.VisibleForTesting
 import com.ameer.uyirmesh.BuildConfig
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.Authenticity
 import com.ameer.uyirmesh.core.Drop
 import com.ameer.uyirmesh.core.HeartbeatPayload
+import com.ameer.uyirmesh.core.PositionAuth
 import com.ameer.uyirmesh.core.MeshEngine
 import com.ameer.uyirmesh.core.Outbox
 import com.ameer.uyirmesh.core.Packet
 import com.ameer.uyirmesh.core.PacketType
+import com.ameer.uyirmesh.core.PinnedBaseKeys
 import com.ameer.uyirmesh.core.Roles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -43,7 +46,9 @@ data class MeshStats(
  */
 class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
     val engine = MeshEngine(myId)
-    val outbox = Outbox(myId, Graph.pinned)
+    /** Builds this phone's packets (encryption and signatures). Replaced only by [usePinnedForTest]. */
+    @Volatile var outbox = Outbox(myId, Graph.pinned)
+        private set
     val link = NearbyLink(ctx, myId, { roleChar() }, this)
 
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "mesh-worker") }.asCoroutineDispatcher()
@@ -168,7 +173,7 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
         val bundle = if (s.role == Roles.RESCUER) Graph.rescuer.bundle() else null
         val shareLoc = s.role != Roles.PUBLIC
         val loc = if (shareLoc) Graph.loc.last else null
-        val hb = HeartbeatPayload(
+        val plain = HeartbeatPayload(
             role = s.role,
             battery = batteryPercent(),
             neighbours = _peers.value.map { it.deviceId },
@@ -179,7 +184,10 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
             name = if (shareLoc) (bundle?.cert?.name ?: s.name) else "",
             version = BuildConfig.VERSION_NAME,
             at = System.currentTimeMillis(),
+            locAt = loc?.time ?: 0L,
         )
+        // A rescuer signs its position with the team key, so the base knows it is genuine.
+        val hb = if (bundle != null) PositionAuth.sign(bundle.teamKey, engine.myId, plain) else plain
         if (s.role == Roles.BASE && Graph.base.hasKeys()) {
             Graph.base.onHeartbeat(engine.myId, hb, 0)
         } else {
@@ -188,6 +196,16 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
     }
 
     fun batteryPercent(): Int = Companion.batteryPercent(ctx)
+
+    /** Only for the on-device smoke test: seal this phone's packets for the generated test base. */
+    @VisibleForTesting
+    fun usePinnedForTest(keys: PinnedBaseKeys) {
+        val old = outbox
+        outbox = Outbox(engine.myId, keys).also {
+            it.ttl = old.ttl
+            it.drill = old.drill
+        }
+    }
 
     companion object {
         fun batteryPercent(ctx: Context): Int {

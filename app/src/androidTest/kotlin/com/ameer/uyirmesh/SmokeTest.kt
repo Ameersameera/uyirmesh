@@ -26,10 +26,12 @@ import com.ameer.uyirmesh.base.Reports
 import com.ameer.uyirmesh.core.*
 import com.ameer.uyirmesh.data.CaseItem
 import com.ameer.uyirmesh.data.CaseStatus
+import com.ameer.uyirmesh.data.RescuerRecord
 import com.ameer.uyirmesh.data.TaskItem
 import com.ameer.uyirmesh.mesh.MeshService
 import com.ameer.uyirmesh.ui.L
 import com.ameer.uyirmesh.util.CrashLog
+import com.ameer.uyirmesh.util.MapsLink
 import com.ameer.uyirmesh.web.DashboardServer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -82,10 +84,11 @@ internal fun smokePermissions(): Array<String> = buildList {
  * other phones of the mesh by handing the app real encrypted and signed packets, exactly as Nearby would:
  *  1. setup and every public screen (English, Tamil, large text, dark theme, find-me tools)
  *  2. victim: hands-free countdown, SOS form, signed replies from the base and a rescuer, forged reply, cancel
- *  3. base: key file import, login, SOS arriving over a relay, AI priority, rescuer IDs, alerts, shelters,
- *     laptop dashboard over HTTP, CSV/PDF reports, victim cancel
- *  4. rescuer: ID QR + PIN login, SOS read and passed on, signed task from the base, status updates, team chat,
- *     PIN lock, log out
+ *  3. base: key file import, login, SOS arriving over a relay, AI priority, rescuer IDs, live tracking of the
+ *     team (signed positions, forged ones ignored), alerts, shelters, laptop dashboard over HTTP, CSV/PDF
+ *     reports, victim cancel
+ *  4. rescuer: ID QR + PIN login, signed heartbeat position, SOS read and passed on, signed task from the base,
+ *     status updates, Google Maps buttons, team chat, PIN lock, log out
  */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -412,6 +415,53 @@ class SmokeTest {
         assertTrue(Graph.store.rescuers.value.any { it.name == "Karthik" && it.team == "ALPHA" })
         back()
 
+        // Team ALPHA takes the case. Karthik's phone reports its position about once a minute, signed with the team
+        // key, and the base shows whether he is really getting closer. Forged positions are ignored.
+        tab(en("cases"))
+        click(hasText("on the roof", substring = true) and hasClickAction())
+        waitRoute("case/${sos.caseId}")
+        click(hasText("ALPHA", substring = true) and hasClickAction())
+        waitUntil("assigned to ALPHA") { caseOf(sos.caseId)?.team == "ALPHA" }
+        tap(en("cs_on_way"))
+        waitUntil("on the way again") { caseOf(sos.caseId)?.status == CaseStatus.ON_THE_WAY }
+        waitText(en("tracking_none").replace("{t}", "ALPHA"))
+        waitText(en("nav_google_maps"))
+        val karthikId = Graph.store.rescuers.value.first { it.name == "Karthik" }.rescuerId
+        val alphaKey = Graph.base.teamKey("ALPHA", create = false)!!
+        val karthikPhone = Ids.newDeviceId()
+        val vLat = caseOf(sos.caseId)!!.lat!!
+        val vLon = caseOf(sos.caseId)!!.lon!!
+        fun karthikAt(minutesAgo: Int, metresSouth: Double, key: ByteArray = alphaKey, battery: Int = 70): Packet {
+            val hb = HeartbeatPayload(
+                Roles.RESCUER, battery, emptyList(), vLat - metresSouth / 111_195.0, vLon, "ALPHA", karthikId, "Karthik", "1.0",
+                now(), now() - minutesAgo * 60_000L,
+            )
+            return Outbox(karthikPhone, TestBase.pinned).sealedBase(PacketType.HEARTBEAT, PositionAuth.sign(key, karthikPhone, hb).toBytes())
+        }
+        for ((i, step) in listOf(6 to 1200.0, 3 to 900.0, 0 to 600.0).withIndex()) {
+            inject(karthikAt(step.first, step.second))
+            waitUntil("Karthik's position ${i + 1}") { (rescuerOf(karthikId)?.trail?.size ?: 0) >= i + 1 }
+        }
+        val approach = Graph.base.approaches(caseOf(sos.caseId)!!).single { it.rescuer.rescuerId == karthikId }.approach
+        assertEquals(Tracking.Trend.CLOSER, approach.trend)
+        assertEquals(600.0, approach.distanceM, 25.0)
+        Log.i(TAG, "tracking: ${approach.trend} ${approach.distanceM.toInt()} m (was ${approach.earlierM?.toInt()} m), ETA ${approach.etaMin} min")
+        waitText(en("trend_closer"))
+        val before = rescuerOf(karthikId)!!
+        val forger = Ids.newDeviceId()
+        inject(karthikAt(0, 0.0, key = Crypto.random(32), battery = 99))
+        inject(Outbox(forger, TestBase.pinned).sealedBase(PacketType.HEARTBEAT, HeartbeatPayload(Roles.RESCUER, 98, emptyList(), vLat, vLon, "ALPHA", karthikId, "Karthik", "1.0", now(), now()).toBytes()))
+        waitUntil("forged positions looked at") {
+            val nodes = Graph.store.nodes.value
+            nodes.any { it.deviceId == forger } && nodes.any { it.deviceId == karthikPhone && it.battery == 99 }
+        }
+        val after = rescuerOf(karthikId)!!
+        assertEquals(before.lat, after.lat)
+        assertEquals(before.posAt, after.posAt)
+        assertEquals(70, after.battery)
+        waitUntil("forged position noted in the log") { Graph.store.log.value.any { it.text.contains("not signed with team ALPHA") } }
+        back()
+
         tab(en("map"))
         waitText(en("heatmap"))
         tab(en("network"))
@@ -456,6 +506,7 @@ class SmokeTest {
         val state = http("GET", "/api/state", cookie = cookie)
         assertEquals(200, state.code)
         assertTrue(state.body.contains(sos.caseId))
+        assertTrue("team tracking on the laptop", state.body.contains("\"trend\":\"CLOSER\""))
         val csvDownload = http("GET", "/api/export.csv", cookie = cookie)
         assertEquals(200, csvDownload.code)
         assertTrue(csvDownload.body.contains(sos.caseId))
@@ -511,6 +562,26 @@ class SmokeTest {
         val teamKey = Graph.base.teamKey("ALPHA", create = false)
         assertNotNull(teamKey)
 
+        // This phone's heartbeat carries its position signed with the team key, and the base accepts it.
+        val myId = Graph.mesh.engine.myId
+        Graph.mesh.sendHeartbeat()
+        val mine = ArrayList<Packet>()
+        waitUntil("own heartbeat waiting to be sent") {
+            mine.clear()
+            // Looks into the store-and-forward buffer without removing anything.
+            Graph.mesh.engine.forgetWhere { p ->
+                if (p.type == PacketType.HEARTBEAT && p.src == myId) mine.add(p)
+                false
+            }
+            mine.isNotEmpty()
+        }
+        val ownHb = HeartbeatPayload.fromBytes(Opener.asBase(TestBase.keys, TestBase.pinned, mine.maxBy { it.createdAt }))
+        val priyaId = Graph.rescuer.bundle()!!.cert.rescuerId
+        assertEquals(priyaId, ownHb.rescuerId)
+        assertTrue("heartbeat position signed with the team key", PositionAuth.verify(teamKey!!, myId, ownHb))
+        Graph.base.onHeartbeat(myId, ownHb, 0)
+        assertTrue(rescuerOf(priyaId)!!.lastSeen > 0)
+
         // An SOS passes through this rescuer: the rescuer can read it AND passes it on towards the base.
         val victimOut = Outbox(Ids.newDeviceId(), TestBase.pinned)
         val sos = SosPayload(caseId = Ids.newId(), kind = EmergencyKind.MEDICAL, people = 2, injured = true, note = "near the temple tank", battery = 40, lat = 11.6700, lon = 78.1500, sentAt = now())
@@ -521,7 +592,7 @@ class SmokeTest {
 
         // A task from the base (signed, team key); an unsigned task is refused.
         val baseTask = TaskPayload(Ids.newId(), Ids.newDeviceId(), 11.6800, 78.1600, "Critical", 92, "Fire · 3 people · injured", "", 3, "ALPHA", now())
-        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).teamSignedByBase(TestBase.keys, PacketType.TASK, baseTask.toBytes(), "ALPHA", teamKey!!))
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).teamSignedByBase(TestBase.keys, PacketType.TASK, baseTask.toBytes(), "ALPHA", teamKey))
         waitUntil("task from the base") { taskOf(baseTask.caseId) != null }
         val forgedBefore = Graph.mesh.engine.metrics.forgedDrops
         val fakeTask = TaskPayload(Ids.newId(), Ids.newDeviceId(), null, null, "Critical", 99, "fake task", "", 1, "ALPHA", now())
@@ -536,6 +607,8 @@ class SmokeTest {
         tab(en("tasks"))
         click(hasText("Fire · 3 people", substring = true) and hasClickAction())
         waitRoute("task/${baseTask.caseId}")
+        waitText(en("nav_google_maps"))
+        waitText(en("open_map_app"))
         tap(en("accept"))
         waitUntil("task accepted") { taskOf(baseTask.caseId)?.state == TaskState.ACCEPTED }
         tap(en("on_my_way"))
@@ -576,6 +649,15 @@ class SmokeTest {
     }
 
     @Test
+    fun a4b_googleMapsLinks() {
+        assertEquals("google.navigation:q=11.664300,78.146000&mode=d", MapsLink.navigationUri(11.6643, 78.146).toString())
+        assertEquals("geo:11.664300,78.146000?q=11.664300,78.146000(SOS%20Ravi)", MapsLink.pinUri(11.6643, 78.146, "SOS Ravi").toString())
+        assertEquals("geo:11.664300,78.146000?q=11.664300,78.146000(a%20b)", MapsLink.pinUri(11.6643, 78.146, "a(b)").toString())
+        assertEquals("https://maps.google.com/?q=11.664300,78.146000", MapsLink.webUrl(11.6643, 78.146))
+        assertEquals("https://maps.google.com/?q=-0.000010,-79.000000", MapsLink.webUrl(-0.00001, -79.0))
+    }
+
+    @Test
     fun a5_noCrashRecorded() {
         val crash = CrashLog.read()
         assertNull("The app recorded a crash:\n$crash", crash)
@@ -588,6 +670,7 @@ class SmokeTest {
     private fun act(): MainActivity = rule.activity
     private fun caseOf(id: String): CaseItem? = Graph.store.cases.value.firstOrNull { it.caseId == id }
     private fun taskOf(id: String): TaskItem? = Graph.store.tasks.value.firstOrNull { it.caseId == id }
+    private fun rescuerOf(id: String): RescuerRecord? = Graph.store.rescuers.value.firstOrNull { it.rescuerId == id }
 
     /** A packet arriving from a neighbouring phone over Nearby. */
     private fun inject(p: Packet, from: String = Ids.newDeviceId()) = Graph.mesh.onBytes(from, PacketCodec.encode(p))

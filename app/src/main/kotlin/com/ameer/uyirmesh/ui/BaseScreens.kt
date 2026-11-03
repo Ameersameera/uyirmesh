@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -64,6 +65,7 @@ import com.ameer.uyirmesh.core.LatLon
 import com.ameer.uyirmesh.core.Roles
 import com.ameer.uyirmesh.data.CaseItem
 import com.ameer.uyirmesh.data.CaseStatus
+import com.ameer.uyirmesh.data.RescuerRecord
 import com.ameer.uyirmesh.mesh.MeshService
 import com.ameer.uyirmesh.mesh.PublicHub
 import kotlinx.coroutines.Dispatchers
@@ -332,8 +334,12 @@ private fun BaseMap(nav: Nav) {
     val zones = alerts.filter { (it.kind == AlertKind.DANGER || it.kind == AlertKind.EVACUATE) && it.isValid(now) && it.lat != null && it.lon != null }
         .map { MapZone(it.lat!!, it.lon!!, it.radiusM.coerceAtLeast(50).toDouble(), Palette.Red, it.title) } +
         hotspots.map { MapZone(it.center.lat, it.center.lon, it.radiusM + 40, Palette.Orange, "") }
+    // Where each team member went in the last 30 minutes.
+    val rescuerTrails = rescuers.filter { it.lat != null && now - it.lastSeen < 30 * 60_000 }.map { r ->
+        MapTrail(Graph.base.fixesOf(r).filter { now - it.at < 30 * 60_000 && Geo.isValid(it.lat, it.lon) }.map { LatLon(it.lat, it.lon) }, Palette.Blue.copy(alpha = 0.55f))
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        RadarMap(baseLoc, markers, zones = zones, heat = if (showHeat) open.map { LatLon(it.lat!!, it.lon!!) } else emptyList(), selected = selected, onTap = { selected = it })
+        RadarMap(baseLoc, markers, zones = zones, trails = rescuerTrails, heat = if (showHeat) open.map { LatLon(it.lat!!, it.lon!!) } else emptyList(), selected = selected, onTap = { selected = it })
         MapLegend(listOf(Palette.Red to L.t("p_critical"), Palette.Orange to L.t("p_high"), Palette.Amber to L.t("p_medium"), Palette.Green to L.t("p_low"), Palette.Blue to L.t("teams"), Palette.Teal to L.t("shelters")))
         SwitchRow(tr("heatmap"), tr("heatmap_sub"), showHeat) { showHeat = it }
         if (baseLoc == null) Text(tr("waiting_gps"), color = Palette.Orange)
@@ -343,9 +349,40 @@ private fun BaseMap(nav: Nav) {
         }
         selected?.let { id ->
             if (id.startsWith("c")) cases.firstOrNull { "c" + it.caseId == id }?.let { c -> CaseCard(c) { nav.go("case/${c.caseId}") } }
-            if (id.startsWith("r")) rescuers.firstOrNull { "r" + it.rescuerId == id }?.let { r -> InfoCard { Text("${r.name} · ${r.team} · ${agoText(r.lastSeen)} · ${if (r.battery >= 0) "${r.battery}%" else ""}") } }
+            if (id.startsWith("r")) rescuers.firstOrNull { "r" + it.rescuerId == id }?.let { r -> RescuerMapCard(nav, r, cases) }
             if (id.startsWith("s")) shelters.firstOrNull { "s" + it.id == id }?.let { s -> InfoCard { Text("${s.name}: ${s.occupancy}/${s.capacity}") } }
         }
+    }
+}
+
+/** A rescuer tapped on the base map: when last heard from, and how they are doing on their team's open cases. */
+@Composable
+private fun RescuerMapCard(nav: Nav, r: RescuerRecord, cases: List<CaseItem>) {
+    InfoCard {
+        Text("${r.name} · ${tr("team")} ${r.team}", fontWeight = FontWeight.Bold)
+        Text(
+            listOfNotNull(
+                "${tr("seen")} ${agoText(r.lastSeen)}",
+                if (r.lat != null) tr("position_age").replace("{a}", agoText(r.positionAt)) else null,
+                if (r.battery >= 0) "${tr("battery")} ${r.battery}%" else null,
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        val onTheWay = cases.filter { it.team == r.team && (it.status == CaseStatus.ASSIGNED || it.status == CaseStatus.ON_THE_WAY) }
+        for (c in onTheWay) {
+            val a = Graph.base.approaches(c).firstOrNull { it.rescuer.rescuerId == r.rescuerId }
+            if (a != null) {
+                val (label, color) = trendLabel(a.approach)
+                Row(
+                    Modifier.fillMaxWidth().clickable { nav.go("case/${c.caseId}") }.padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${tr("case")} ${c.caseId.take(6)} · ${Geo.formatDistance(a.approach.distanceM)}", Modifier.weight(1f))
+                    Chip(label, color)
+                }
+            }
+        }
+        if (r.lat != null && r.lon != null) MapButtons(r.lat, r.lon, r.name, note = false)
     }
 }
 
@@ -383,6 +420,7 @@ private fun TeamsTab(nav: Nav) {
                             Text(
                                 (if (r.lastSeen > 0) "${tr("seen")} ${agoText(r.lastSeen)}" else tr("not_seen_yet")) +
                                     (if (r.battery >= 0) " · ${r.battery}%" else "") +
+                                    (if (r.lat != null) " · " + tr("position_age").replace("{a}", agoText(r.positionAt)) else "") +
                                     " · ${tr("valid_until")} ${timeText(r.expiresAt)}",
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -526,6 +564,8 @@ private fun MoreTab(nav: Nav) {
 fun CaseScreen(nav: Nav, caseId: String) {
     val ctx = LocalContext.current
     val cases by Graph.store.cases.flow.collectAsStateWithLifecycle()
+    val rescuers by Graph.store.rescuers.flow.collectAsStateWithLifecycle()
+    val now = rememberNow()
     val c = cases.firstOrNull { it.caseId == caseId }
     var message by remember { mutableStateOf("") }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -604,6 +644,8 @@ fun CaseScreen(nav: Nav, caseId: String) {
                     }
                 }
             }
+            val tracking = c.team.isNotBlank() && (c.status == CaseStatus.ASSIGNED || c.status == CaseStatus.ON_THE_WAY)
+            val approaches = remember(c, rescuers) { if (tracking) Graph.base.approaches(c) else emptyList() }
             if (c.lat != null && c.lon != null) {
                 SectionTitle(tr("map"))
                 val baseLoc = Graph.loc.lastLatLon
@@ -612,10 +654,23 @@ fun CaseScreen(nav: Nav, caseId: String) {
                     listOfNotNull(
                         baseLoc?.let { MapMarker("base", it.lat, it.lon, Palette.Red, L.t("base_short"), 3) },
                         MapMarker("c", c.lat, c.lon, Palette.priority(c.label), c.label, 0),
-                    ),
-                    trail = c.track.map { LatLon(it.lat, it.lon) },
+                    ) + approaches.map { a ->
+                        val f = a.fixes.last()
+                        MapMarker("r" + a.rescuer.rescuerId, f.lat, f.lon, Palette.Blue, a.rescuer.name, 1)
+                    },
+                    trails = listOf(MapTrail(c.track.map { LatLon(it.lat, it.lon) }, Palette.priority(c.label), dashed = true)) +
+                        approaches.map { a -> MapTrail(a.fixes.map { LatLon(it.lat, it.lon) }, Palette.Blue) },
                 )
+                MapLegend(
+                    listOfNotNull(
+                        Palette.Red to L.t("base_short"),
+                        Palette.priority(c.label) to L.t("victim"),
+                        if (approaches.isNotEmpty()) Palette.Blue to L.t("rescuer") else null,
+                    ),
+                )
+                MapButtons(c.lat, c.lon, "SOS ${c.caseId.take(6)}")
             }
+            if (tracking) TrackingSection(c.team, c.lat != null && c.lon != null, approaches, now)
             SectionTitle(tr("assign_team"))
             val teams = Graph.base.teams()
             if (teams.isEmpty()) Text(tr("no_teams_yet"), style = MaterialTheme.typography.bodySmall)

@@ -345,16 +345,23 @@ data class RescuerRecord(
     val lat: Double? = null,
     val lon: Double? = null,
     val battery: Int = -1,
+    /** When the GPS fix in [lat]/[lon] was taken; 0 if unknown (then [lastSeen] is the best guess). */
+    val posAt: Long = 0,
+    /** Recent verified positions, oldest first (to see whether the rescuer is getting closer to a victim). */
+    val trail: List<Crumb> = emptyList(),
 ) {
+    /** Time of the latest position. */
+    val positionAt: Long get() = if (posAt > 0) posAt else lastSeen
+
     fun toJson() = linkedMapOf(
         "i" to rescuerId, "n" to name, "tm" to team, "ia" to issuedAt, "ea" to expiresAt, "d" to deviceId,
-        "ls" to lastSeen, "la" to lat, "lo" to lon, "b" to battery,
+        "ls" to lastSeen, "la" to lat, "lo" to lon, "b" to battery, "pa" to posAt, "tr" to trail.map { it.toJson() },
     )
 
     companion object {
         fun from(m: Map<String, Any?>) = RescuerRecord(
             m.str("i"), m.str("n"), m.str("tm"), m.long("ia"), m.long("ea"), m.str("d"), m.long("ls"),
-            m.doubleOrNull("la"), m.doubleOrNull("lo"), m.int("b", -1),
+            m.doubleOrNull("la"), m.doubleOrNull("lo"), m.int("b", -1), m.long("pa"), m.objs("tr").map { Crumb.from(it) },
         )
     }
 }

@@ -47,6 +47,9 @@ data class MapMarker(
 
 data class MapZone(val lat: Double, val lon: Double, val radiusM: Double, val color: Color, val label: String)
 
+/** A path drawn on the map (e.g. a rescuer's recent positions). */
+data class MapTrail(val points: List<LatLon>, val color: Color, val dashed: Boolean = false)
+
 /**
  * Offline radar map: no map tiles or internet. Everything is drawn around the centre by distance and
  * compass direction (equirectangular projection), with range rings, heat and zones.
@@ -58,13 +61,14 @@ fun RadarMap(
     modifier: Modifier = Modifier,
     zones: List<MapZone> = emptyList(),
     trail: List<LatLon> = emptyList(),
+    trails: List<MapTrail> = emptyList(),
     heat: List<LatLon> = emptyList(),
     selected: String? = null,
     onTap: (String) -> Unit = {},
 ) {
     var zoom by remember { mutableFloatStateOf(1f) }
     val origin = center ?: markers.firstOrNull()?.let { LatLon(it.lat, it.lon) } ?: LatLon(0.0, 0.0)
-    val far = (markers.map { LatLon(it.lat, it.lon) } + trail + heat + zones.map { LatLon(it.lat, it.lon) })
+    val far = (markers.map { LatLon(it.lat, it.lon) } + trail + trails.flatMap { it.points } + heat + zones.map { LatLon(it.lat, it.lon) })
         .maxOfOrNull { Geo.distanceM(origin, it) } ?: 0.0
     val range = niceRange(max(far * 1.15, 150.0)) / zoom
     val bg = MaterialTheme.colorScheme.surfaceVariant
@@ -143,6 +147,16 @@ fun RadarMap(
                     if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
                 }
                 drawPath(path, Color(0xFF1565C0), style = Stroke(3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f))))
+            }
+            for (t in trails) {
+                if (t.points.size < 2) continue
+                val path = Path()
+                t.points.forEachIndexed { i, pt ->
+                    val p = project(pt.lat, pt.lon)
+                    if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                }
+                val effect = if (t.dashed) PathEffect.dashPathEffect(floatArrayOf(10f, 6f)) else null
+                drawPath(path, t.color, style = Stroke(3.dp.toPx(), pathEffect = effect))
             }
             // Markers.
             val label = Paint(text).apply { textSize = 11.dp.toPx() }

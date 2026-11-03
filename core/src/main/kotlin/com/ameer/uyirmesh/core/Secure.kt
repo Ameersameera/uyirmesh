@@ -100,3 +100,39 @@ object Authenticity {
         return if (Crypto.verifyPacket(cert.pub, p)) cert else null
     }
 }
+
+/**
+ * Proves that a rescuer heartbeat's position really comes from a member of that rescue team.
+ *
+ * Heartbeats are sealed for the base, but anyone could seal one, so a rescuer phone adds a MAC made with a
+ * key derived from its team key. The base (which created the team key) checks it before it moves that
+ * rescuer on the map or uses the position to tell whether the team is getting closer to a victim.
+ */
+object PositionAuth {
+    private const val MAC_BYTES = 16
+
+    private fun macKey(teamKey: ByteArray): ByteArray =
+        Crypto.hkdfSha256(teamKey, ByteArray(0), "UyirMesh position MAC v1".toByteArray(Charsets.UTF_8), 32)
+
+    private fun e6(v: Double?): String = if (v == null) "-" else Math.round(v * 1e6).toString()
+
+    private fun input(src: String, hb: HeartbeatPayload): ByteArray =
+        listOf("UMPOS1", src, hb.rescuerId, hb.team, e6(hb.lat), e6(hb.lon), hb.locAt, hb.at, hb.battery)
+            .joinToString("|").toByteArray(Charsets.UTF_8)
+
+    /** The heartbeat with its MAC filled in; [src] is this phone's mesh id. */
+    fun sign(teamKey: ByteArray, src: String, hb: HeartbeatPayload): HeartbeatPayload =
+        hb.copy(mac = B64.encode(Crypto.hmacSha256(macKey(teamKey), input(src, hb)).copyOf(MAC_BYTES)))
+
+    /** True if [hb] (received from mesh id [src]) carries a valid MAC for [teamKey]. */
+    fun verify(teamKey: ByteArray, src: String, hb: HeartbeatPayload): Boolean {
+        if (hb.mac.isEmpty()) return false
+        val got = try {
+            B64.decode(hb.mac)
+        } catch (e: Exception) {
+            return false
+        }
+        val want = Crypto.hmacSha256(macKey(teamKey), input(src, hb)).copyOf(MAC_BYTES)
+        return got.size == MAC_BYTES && java.security.MessageDigest.isEqual(got, want)
+    }
+}

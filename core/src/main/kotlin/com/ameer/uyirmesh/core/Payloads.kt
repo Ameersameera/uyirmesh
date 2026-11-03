@@ -350,11 +350,15 @@ data class HeartbeatPayload(
     val name: String = "",
     val version: String = "",
     val at: Long = 0,
+    /** When the GPS fix in [lat]/[lon] was taken (sender's clock), 0 if unknown. */
+    val locAt: Long = 0,
+    /** Rescuer heartbeats only: team-key MAC over the position, see [PositionAuth]. */
+    val mac: String = "",
 ) {
     fun toBytes(): ByteArray = Json.toBytes(
         linkedMapOf(
             "ro" to role, "b" to battery, "nb" to neighbours, "la" to lat.r6(), "lo" to lon.r6(), "tm" to team,
-            "ri" to rescuerId, "n" to name, "v" to version, "t" to at,
+            "ri" to rescuerId, "n" to name, "v" to version, "t" to at, "lt" to locAt, "mc" to mac,
         )
     )
 
@@ -364,6 +368,7 @@ data class HeartbeatPayload(
             return HeartbeatPayload(
                 m.str("ro", Roles.PUBLIC), m.int("b", -1), m.strList("nb").take(32), m.doubleOrNull("la"),
                 m.doubleOrNull("lo"), m.str("tm"), m.str("ri"), m.str("n").take(60), m.str("v"), m.long("t"),
+                m.long("lt"), m.str("mc").take(64),
             )
         }
     }
@@ -416,11 +421,14 @@ data class TaskStatusPayload(
     val lat: Double?,
     val lon: Double?,
     val at: Long = 0,
+    /** When the GPS fix in [lat]/[lon] was taken (sender's clock), 0 if unknown. */
+    val locAt: Long = 0,
+    val battery: Int = -1,
 ) {
     fun toBytes(): ByteArray = Json.toBytes(
         linkedMapOf(
             "c" to caseId, "ri" to rescuerId, "rn" to rescuerName, "tm" to team, "s" to status,
-            "la" to lat.r6(), "lo" to lon.r6(), "t" to at,
+            "la" to lat.r6(), "lo" to lon.r6(), "t" to at, "lt" to locAt, "b" to battery,
         )
     )
 
@@ -429,7 +437,7 @@ data class TaskStatusPayload(
             val m = Json.objectFromBytes(b)
             return TaskStatusPayload(
                 m.str("c"), m.str("ri"), m.str("rn").take(60), m.str("tm"), m.str("s"), m.doubleOrNull("la"),
-                m.doubleOrNull("lo"), m.long("t"),
+                m.doubleOrNull("lo"), m.long("t"), m.long("lt"), m.int("b", -1),
             )
         }
     }

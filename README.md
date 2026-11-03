@@ -18,8 +18,8 @@ Download the latest APK: **Releases → v1.0 → UyirMesh.apk** (Android 8.0 or 
 | Mode | Who | What it does |
 |---|---|---|
 | Public | everyone | SOS (form, voice "help help", shake, widget, quick tile, shortcut, lock-screen notification button), status timeline, voice note and photo, find-me tools (siren, flashlight SOS, screen strobe, vibration), I'm safe, group chat, alerts, missing persons, shelters and danger zones, citizen reports, volunteers, medical card QR, first aid (Tamil/English), relaying for others |
-| Rescuer | teams with a base-signed ID QR + PIN | tasks from the base, SOS in radio range opened directly, accept / on the way / rescued, best visit order, breadcrumb trail, encrypted team chat, scan victim QR, auto-lock |
-| Rescue base | holder of the base key file | AI priority with reasons, duplicate merge, DBSCAN hotspots, heat map, auto-assign with ETA, signed alerts, shelters and supplies, rescuer IDs, topology and packet path trace, CSV/PDF reports, laptop web dashboard over the phone's hotspot, offline APK download page |
+| Rescuer | teams with a base-signed ID QR + PIN | tasks from the base, SOS in radio range opened directly, accept / on the way / rescued, "Navigate in Google Maps" to the victim, best visit order, breadcrumb trail, position sent to the base about once a minute (signed with the team key), encrypted team chat, scan victim QR, auto-lock |
+| Rescue base | holder of the base key file | AI priority with reasons, duplicate merge, DBSCAN hotspots, heat map, auto-assign with ETA, **live team tracking** (distance to the victim, getting closer / not moving / moving away, measured ETA, team trails on the map), signed alerts, shelters and supplies, rescuer IDs, topology and packet path trace, CSV/PDF reports, laptop web dashboard over the phone's hotspot (with Google Maps links), offline APK download page |
 
 ## How the mesh works (`core/MeshEngine.kt`)
 
@@ -37,6 +37,8 @@ Download the latest APK: **Releases → v1.0 → UyirMesh.apk** (Android 8.0 or 
 * Rescuer IDs: certificates signed by the base (base → rescuer → message chain); the QR is encrypted with
   the PIN (PBKDF2-HMAC-SHA256 + AES-256-GCM).
 * Team traffic: AES-256-GCM with a per-team key.
+* Rescuer positions in heartbeats: HMAC-SHA256 with a key derived from the team key (`PositionAuth`), so only
+  a real team member can move a rescuer on the base map; unsigned or wrongly signed positions are ignored.
 * Base key file: private keys protected with a password (PBKDF2 200k + AES-256-GCM). **Never committed.**
 * Phone storage: encrypted with an Android Keystore key. Device IDs are random (no IMEI, no SIM data).
 
@@ -47,10 +49,23 @@ labelled by a weighted triage policy, exported to JSON and evaluated on the phon
 explained with tree-path contributions ("Injured +22", "Flood water rising +14"). Waiting time and repeated
 messages raise the score. Test accuracy 80.1 %, 99.8 % within one class — see `ml/model_report.md`.
 
+## Live tracking and maps (`core/Tracking.kt`)
+
+* Victim: position with the SOS, then every 2 min (5 min in battery saver) and a last one at 5 % battery.
+* Rescuer: position about once a minute (3 min in battery saver) and with every status button.
+* The base compares each rescuer's distance to the victim now and about 5 minutes earlier: getting closer,
+  moving at the same distance, not moving for N minutes, moving away, or reached (within 60 m), with an ETA
+  from the measured approach speed. It is near-live (about a minute), not second-by-second.
+* Maps inside the app are offline radar maps (no tiles, no internet). "Navigate in Google Maps" and
+  "Open pin in map app" hand the position to the phone's map app with a normal Android link (no API key).
+  Without internet, Google Maps shows the map and driving routes only for areas downloaded beforehand
+  (Google Maps > Offline maps); walking routes need internet.
+
 ## Build
 
 GitHub Actions builds the signed APK on every push (`.github/workflows/build-apk.yml`):
-core unit tests → offline speech model download (Vosk small Indian English) → `assembleRelease` → release.
+core unit tests → offline speech model download (Vosk small Indian English) → `assembleRelease`, plus the
+on-device smoke test on an Android 14 emulator → the release is published only when both pass.
 
 Local build: Android Studio (JDK 17), run `scripts/fetch_voice_model.sh` once for the voice SOS model.
 The pure-Kotlin core can be tested without Android: `localtest/run_core_tests.sh`.

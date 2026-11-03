@@ -62,6 +62,7 @@ import com.ameer.uyirmesh.core.TaskState
 import com.ameer.uyirmesh.mesh.MeshService
 import com.ameer.uyirmesh.sos.VoiceTrigger
 import com.ameer.uyirmesh.util.CrashLog
+import com.ameer.uyirmesh.util.MapsLink
 import com.ameer.uyirmesh.util.Perms
 import kotlinx.coroutines.delay
 import java.io.File
@@ -104,6 +105,7 @@ fun FirstAidScreen(nav: Nav) {
 
 @Composable
 fun SheltersScreen(nav: Nav) {
+    val ctx = LocalContext.current
     val alerts by Graph.store.alerts.flow.collectAsStateWithLifecycle()
     val me = Graph.loc.lastLatLon
     val now = System.currentTimeMillis()
@@ -125,7 +127,12 @@ fun SheltersScreen(nav: Nav) {
                     if (inside) Text(tr("you_are_inside_leave"), color = Palette.Red, fontWeight = FontWeight.Bold)
                 }
             }
-            item { SectionTitle(tr("shelters")) }
+            item {
+                SectionTitle(tr("shelters"))
+                if (shelters.any { it.lat != null && it.lon != null }) {
+                    Text(tr("gmaps_offline_note"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             if (shelters.isEmpty()) item { EmptyState(Ic.Shelter, tr("no_shelters")) }
             items(shelters.sortedBy { s -> if (me != null && s.lat != null && s.lon != null) Geo.distanceM(me, LatLon(s.lat, s.lon)) else Double.MAX_VALUE }, key = { it.id }) { s ->
                 val full = s.capacity > 0 && s.occupancy >= s.capacity
@@ -136,6 +143,10 @@ fun SheltersScreen(nav: Nav) {
                     }
                     Text(s.message, style = MaterialTheme.typography.bodySmall)
                     Text(distanceFromMe(s.lat, s.lon).removePrefix(" · ") + " · ${tr("updated")} ${timeText(s.at)}", style = MaterialTheme.typography.bodySmall)
+                    if (s.lat != null && s.lon != null) {
+                        Spacer(Modifier.height(6.dp))
+                        TonalButton(tr("nav_google_maps"), Ic.Navigate, Modifier.fillMaxWidth()) { MapsLink.navigate(ctx, s.lat, s.lon, s.title) }
+                    }
                 }
             }
         }

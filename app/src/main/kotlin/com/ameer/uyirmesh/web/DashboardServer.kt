@@ -12,6 +12,7 @@ import com.ameer.uyirmesh.core.int
 import com.ameer.uyirmesh.core.str
 import com.ameer.uyirmesh.core.bool
 import com.ameer.uyirmesh.data.CaseItem
+import com.ameer.uyirmesh.data.CaseStatus
 import com.ameer.uyirmesh.util.AudioConvert
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
@@ -189,7 +190,23 @@ class DashboardServer(private val ctx: Context) : NanoHTTPD(PORT) {
             "media" to c.media.map { mapOf("file" to it.file, "mime" to it.mime, "durationMs" to it.durationMs, "at" to it.at) },
             "track" to c.track.map { listOf(it.lat, it.lon, it.at) },
             "events" to c.events.map { mapOf("at" to it.at, "kind" to it.kind, "text" to it.text) },
+            "tracking" to trackingJson(c),
         )
+    }
+
+    /** For a case with a team on the way: each rescuer's distance to the victim and whether it is shrinking. */
+    private fun trackingJson(c: CaseItem): List<Map<String, Any?>> {
+        if (c.status != CaseStatus.ASSIGNED && c.status != CaseStatus.ON_THE_WAY) return emptyList()
+        return Graph.base.approaches(c).map { t ->
+            val a = t.approach
+            val last = t.fixes.last()
+            linkedMapOf(
+                "rescuer" to t.rescuer.name, "id" to t.rescuer.rescuerId.take(8), "distance" to Math.round(a.distanceM),
+                "trend" to a.trend.name, "earlier" to a.earlierM?.let { Math.round(it) }, "overMin" to a.overMin,
+                "stillMin" to a.stillMin, "at" to a.at, "eta" to a.etaMin, "battery" to t.rescuer.battery,
+                "lat" to last.lat, "lon" to last.lon,
+            )
+        }
     }
 
     private fun state(): Map<String, Any?> {
@@ -211,8 +228,12 @@ class DashboardServer(private val ctx: Context) : NanoHTTPD(PORT) {
             ),
             "cases" to store.cases.value.map { caseJson(it) },
             "teams" to Graph.base.teams(),
-            "rescuers" to store.rescuers.value.map {
-                mapOf("id" to it.rescuerId.take(8), "name" to it.name, "team" to it.team, "lastSeen" to it.lastSeen, "lat" to it.lat, "lon" to it.lon, "battery" to it.battery, "expiresAt" to it.expiresAt)
+            "rescuers" to store.rescuers.value.map { r ->
+                mapOf(
+                    "id" to r.rescuerId.take(8), "name" to r.name, "team" to r.team, "lastSeen" to r.lastSeen, "lat" to r.lat, "lon" to r.lon,
+                    "battery" to r.battery, "expiresAt" to r.expiresAt, "posAt" to r.positionAt,
+                    "trail" to Graph.base.fixesOf(r).filter { now - it.at < 60 * 60_000 }.map { listOf(it.lat, it.lon, it.at) },
+                )
             },
             "nodes" to store.nodes.value.filter { now - it.lastSeen < 30 * 60_000 }.map {
                 mapOf("id" to it.deviceId.take(8), "role" to it.role, "battery" to it.battery, "neighbours" to it.neighbours.map { n -> n.take(8) }, "lastSeen" to it.lastSeen, "name" to it.name, "team" to it.team)

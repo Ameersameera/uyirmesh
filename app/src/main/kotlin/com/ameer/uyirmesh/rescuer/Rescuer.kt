@@ -269,7 +269,7 @@ class Rescuer(private val ctx: Context) {
         val now = System.currentTimeMillis()
         val t = store.tasks.modify({ it.caseId }, caseId) { it.copy(state = state, updatedAt = now) } ?: return
         val loc = Graph.loc.last
-        val st = TaskStatusPayload(caseId, b.cert.rescuerId, b.cert.name, b.cert.team, state, loc?.latitude, loc?.longitude, now)
+        val st = TaskStatusPayload(caseId, b.cert.rescuerId, b.cert.name, b.cert.team, state, loc?.latitude, loc?.longitude, now, loc?.time ?: 0L, Graph.mesh.batteryPercent())
         Graph.mesh.send(Graph.mesh.outbox.team(PacketType.TASK_STATUS, st.toBytes(), b.cert.team, b.teamKey))
         // Tell the victim directly too (works even when the base is out of range).
         val ackStatus = when (state) {

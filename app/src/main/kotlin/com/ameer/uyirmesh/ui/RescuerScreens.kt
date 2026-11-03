@@ -347,6 +347,7 @@ fun TaskScreen(nav: Nav, caseId: String) {
                     MapMarker("t", target.lat, target.lon, Palette.priority(t.label), t.label, 0),
                 ))
                 Text("GPS %.5f, %.5f".format(java.util.Locale.US, t.lat, t.lon), style = MaterialTheme.typography.bodySmall)
+                MapButtons(t.lat, t.lon, "SOS: " + t.summary.take(30))
             } else {
                 Text(tr("no_location_yet"), color = Palette.Orange)
             }
@@ -362,6 +363,7 @@ fun TaskScreen(nav: Nav, caseId: String) {
                 SecondaryButton(tr("unable"), Ic.Cancel) { Graph.rescuer.setTaskState(t.caseId, TaskState.UNABLE) }
             }
             Text(tr("status_goes_to"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            Text(tr("shared_with_base"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }

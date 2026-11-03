@@ -83,6 +83,7 @@ import com.ameer.uyirmesh.data.MySos
 import com.ameer.uyirmesh.mesh.PublicHub
 import com.ameer.uyirmesh.sos.SosForm
 import com.ameer.uyirmesh.sos.VoiceNote
+import com.ameer.uyirmesh.util.MapsLink
 import com.ameer.uyirmesh.util.Perms
 import kotlinx.coroutines.delay
 
@@ -507,9 +508,13 @@ fun smsFamily(ctx: Context, text: String) {
     }
 }
 
+/** SMS for family when there is mobile signal: the newest position as a Google Maps link (opens on any phone). */
 private fun sosSmsText(s: MySos): String {
     val p = s.payload
-    val loc = if (p.lat != null && p.lon != null) " Location: ${"%.5f".format(java.util.Locale.US, p.lat)},${"%.5f".format(java.util.Locale.US, p.lon)}" else ""
+    val fresh = Graph.loc.last?.takeIf { Graph.loc.ageMs() < 15 * 60_000 }
+    val lat = fresh?.latitude ?: p.lat
+    val lon = fresh?.longitude ?: p.lon
+    val loc = if (Geo.isValid(lat, lon)) " Location: ${MapsLink.webUrl(lat!!, lon!!)}" else ""
     return "SOS from ${p.name.ifBlank { "me" }}: ${p.kind.lowercase()}, ${p.people} people.$loc (sent with UyirMesh)"
 }
 

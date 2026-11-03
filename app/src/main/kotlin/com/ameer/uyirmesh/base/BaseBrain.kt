@@ -16,6 +16,7 @@ import com.ameer.uyirmesh.core.Destinations
 import com.ameer.uyirmesh.core.FindMatch
 import com.ameer.uyirmesh.core.FindRequest
 import com.ameer.uyirmesh.core.FindResult
+import com.ameer.uyirmesh.core.Fix
 import com.ameer.uyirmesh.core.ForestModel
 import com.ameer.uyirmesh.core.Geo
 import com.ameer.uyirmesh.core.HeartbeatPayload
@@ -24,6 +25,7 @@ import com.ameer.uyirmesh.core.Json
 import com.ameer.uyirmesh.core.LatLon
 import com.ameer.uyirmesh.core.Packet
 import com.ameer.uyirmesh.core.PacketType
+import com.ameer.uyirmesh.core.PositionAuth
 import com.ameer.uyirmesh.core.Roles
 import com.ameer.uyirmesh.core.SafePayload
 import com.ameer.uyirmesh.core.SosCancel
@@ -34,6 +36,7 @@ import com.ameer.uyirmesh.core.TaskPayload
 import com.ameer.uyirmesh.core.TaskState
 import com.ameer.uyirmesh.core.TaskStatusPayload
 import com.ameer.uyirmesh.core.TeamChatPayload
+import com.ameer.uyirmesh.core.Tracking
 import com.ameer.uyirmesh.core.Triage
 import com.ameer.uyirmesh.core.TriageInput
 import com.ameer.uyirmesh.core.VolunteerPayload
@@ -42,6 +45,7 @@ import com.ameer.uyirmesh.data.CaseEvent
 import com.ameer.uyirmesh.data.CaseItem
 import com.ameer.uyirmesh.data.CaseStatus
 import com.ameer.uyirmesh.data.CheckInItem
+import com.ameer.uyirmesh.data.Crumb
 import com.ameer.uyirmesh.data.MediaRef
 import com.ameer.uyirmesh.data.NodeRecord
 import com.ameer.uyirmesh.data.RescuerRecord
@@ -62,6 +66,9 @@ import kotlinx.coroutines.launch
 
 data class Hotspot(val center: LatLon, val count: Int, val radiusM: Double, val caseIds: List<String>)
 
+/** A rescuer of the case's team, their recent positions (oldest first) and how they are doing on the way to the victim. */
+data class TeamApproach(val rescuer: RescuerRecord, val approach: Tracking.Approach, val fixes: List<Fix>)
+
 /**
  * Rescue base: receives every SOS, ranks it with the on-phone Random Forest, merges duplicates,
  * finds hotspots, assigns teams with an ETA, replies to victims with signed messages, sends
@@ -76,6 +83,7 @@ class BaseBrain(private val ctx: Context) {
     @Volatile private var model: ForestModel? = null
     private val teamKeys = HashMap<String, ByteArray>()
     private var server: DashboardServer? = null
+    private val unverifiedWarned = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked
@@ -419,11 +427,15 @@ class BaseBrain(private val ctx: Context) {
 
     @Synchronized
     fun onTaskStatus(p: Packet, st: TaskStatusPayload) {
-        val c = store.cases.value.firstOrNull { it.caseId == st.caseId } ?: return
         val now = System.currentTimeMillis()
-        if (Geo.isValid(st.lat, st.lon)) {
-            store.rescuers.modify({ it.rescuerId }, st.rescuerId) { it.copy(lat = st.lat, lon = st.lon, lastSeen = now, deviceId = p.src) }
+        // It opened with the team key, so it really comes from that team: trust its position for that team's rescuer.
+        val packetTeam = Destinations.teamName(p.dst)
+        store.rescuers.modify({ it.rescuerId }, st.rescuerId) { r ->
+            if (r.team != packetTeam) r
+            else r.copy(lastSeen = now, deviceId = p.src, battery = if (st.battery >= 0) st.battery else r.battery)
+                .movedTo(st.lat, st.lon, if (st.locAt > 0) st.locAt else st.at, now)
         }
+        val c = store.cases.value.firstOrNull { it.caseId == st.caseId } ?: return
         val eta = if (Geo.isValid(st.lat, st.lon) && c.lat != null && c.lon != null) {
             Geo.etaMinutes(Geo.distanceM(st.lat!!, st.lon!!, c.lat, c.lon), Graph.prefs.now.speedKmh.toDouble())
         } else c.etaMin
@@ -479,10 +491,56 @@ class BaseBrain(private val ctx: Context) {
             NodeRecord(src, hb.role, hb.battery, hb.neighbours, now, hb.name, hb.team, hb.lat, hb.lon, hb.version),
         )
         if (hb.role == Roles.RESCUER && hb.rescuerId.isNotBlank()) {
+            val r = store.rescuers.value.firstOrNull { it.rescuerId == hb.rescuerId } ?: return
+            val key = teamKey(r.team, create = false) ?: return
+            if (!PositionAuth.verify(key, src, hb)) {
+                // Anyone can seal a heartbeat for the base; only the rescuer's team key can sign its position.
+                val last = unverifiedWarned[r.rescuerId] ?: 0L
+                if (now - last > 10 * 60_000) {
+                    unverifiedWarned[r.rescuerId] = now
+                    Graph.log("BASE", "Ignored a position for rescuer ${r.name} that is not signed with team ${r.team}'s key")
+                }
+                return
+            }
             store.rescuers.modify({ it.rescuerId }, hb.rescuerId) {
-                it.copy(deviceId = src, lastSeen = now, lat = hb.lat ?: it.lat, lon = hb.lon ?: it.lon, battery = hb.battery)
+                it.copy(deviceId = src, lastSeen = now, battery = hb.battery).movedTo(hb.lat, hb.lon, hb.locAt, now)
             }
         }
+    }
+
+    /**
+     * The rescuer at a newly reported position. Keeps a short trail of verified positions so the base can see
+     * whether the rescuer is really getting closer to the victim. A position older than the one we already have
+     * (store-and-forward can deliver out of order) does not move the rescuer back.
+     */
+    private fun RescuerRecord.movedTo(lat: Double?, lon: Double?, fixAt: Long, now: Long): RescuerRecord {
+        if (!Geo.isValid(lat, lon)) return this
+        val at = if (fixAt <= 0) now else minOf(fixAt, now)
+        if (at < now - POSITION_MAX_AGE_MS || at < posAt) return this
+        val last = trail.lastOrNull()
+        val add = last == null || Geo.distanceM(last.lat, last.lon, lat!!, lon!!) >= 10 || at - last.at >= 2 * 60_000
+        val newTrail = if (add) (trail.filter { at - it.at <= TRAIL_MAX_AGE_MS } + Crumb(lat!!, lon!!, at)).takeLast(TRAIL_MAX) else trail
+        return copy(lat = lat, lon = lon, posAt = at, trail = newTrail)
+    }
+
+    /** Positions of a rescuer as tracking fixes, oldest first (the trail plus the latest position). */
+    fun fixesOf(r: RescuerRecord): List<Fix> {
+        val list = r.trail.map { Fix(it.lat, it.lon, it.at) }.toMutableList()
+        if (r.lat != null && r.lon != null && list.none { it.at == r.positionAt }) list.add(Fix(r.lat, r.lon, r.positionAt))
+        return list.sortedBy { it.at }
+    }
+
+    /** For a case with a team and a location: every rescuer of that team with a position, nearest first. */
+    fun approaches(c: CaseItem): List<TeamApproach> {
+        if (c.team.isBlank() || c.lat == null || c.lon == null) return emptyList()
+        val target = LatLon(c.lat, c.lon)
+        val speed = Graph.prefs.now.speedKmh.toDouble()
+        return store.rescuers.value.filter { it.team == c.team }
+            .mapNotNull { r ->
+                val fixes = fixesOf(r).filter { Geo.isValid(it.lat, it.lon) }
+                Tracking.approach(target, fixes, speed)?.let { TeamApproach(r, it, fixes) }
+            }
+            .sortedBy { it.approach.distanceM }
     }
 
     fun onSafe(p: Packet, s: SafePayload) {
@@ -652,5 +710,12 @@ class BaseBrain(private val ctx: Context) {
         private const val TEAM_FILE = "team_keys.json"
         private const val PW_ITERATIONS = 60_000
         private const val MAX_ACTIVE_PER_TEAM = 3
+
+        /** Positions older than this are not used at all. */
+        private const val POSITION_MAX_AGE_MS = 6 * 3600_000L
+
+        /** The trail keeps the last few hours of positions (about one a minute while moving). */
+        private const val TRAIL_MAX_AGE_MS = 3 * 3600_000L
+        private const val TRAIL_MAX = 180
     }
 }

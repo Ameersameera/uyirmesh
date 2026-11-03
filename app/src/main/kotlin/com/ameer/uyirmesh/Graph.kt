@@ -119,5 +119,6 @@ object Graph {
     @VisibleForTesting
     fun usePinnedForTest(keys: PinnedBaseKeys) {
         pinned = keys
+        if (::mesh.isInitialized) mesh.usePinnedForTest(keys)
     }
 }
