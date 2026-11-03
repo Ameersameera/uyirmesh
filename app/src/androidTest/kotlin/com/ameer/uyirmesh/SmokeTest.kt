@@ -466,7 +466,11 @@ class SmokeTest {
         waitText(en("heatmap"))
         tab(en("network"))
         waitText(en("packet_paths"))
-        waitText(en("phones_reporting").replace("{n}", "1"))
+        // Phones that sent a heartbeat in the last 15 minutes (the relay, Karthik's phone, the forger, maybe this base).
+        waitUntil("phones reporting") {
+            val live = Graph.store.nodes.value.count { now() - it.lastSeen < 15 * 60_000 }
+            live >= 1 && has(hasText(en("phones_reporting").replace("{n}", live.toString())))
+        }
 
         // Signed alert and a shelter.
         tab(en("more"))
