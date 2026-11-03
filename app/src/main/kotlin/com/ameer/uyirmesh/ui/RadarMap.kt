@@ -94,6 +94,7 @@ fun RadarMap(
             },
         ) {
             val r = size.minDimension / 2f * 0.92f
+            if (r <= 1f) return@Canvas // not laid out yet (a zero-size gradient would throw)
             val c = Offset(size.width / 2f, size.height / 2f)
             fun project(lat: Double, lon: Double): Offset {
                 val (x, y) = Geo.toLocalMetres(origin, LatLon(lat, lon))
