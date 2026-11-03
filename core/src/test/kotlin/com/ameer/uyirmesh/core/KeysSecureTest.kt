@@ -49,11 +49,15 @@ class KeysSecureTest {
         assertTrue(Credentials.verify(pinned, bundle, now))
         val qr = Credentials.toQr(bundle, "4321".toCharArray())
         assertTrue(Credentials.isCredentialQr(qr))
-        assertTrue("QR length ${qr.length}", qr.length < 1500)
+        assertTrue("QR length ${qr.length}", qr.length < 600)
         val back = Credentials.fromQr(qr, "4321".toCharArray())
         assertEquals(bundle.cert.rescuerId, back.cert.rescuerId)
         assertArrayEquals(teamKey, back.teamKey)
         assertTrue(Credentials.verify(pinned, back, now))
+        assertArrayEquals(bundle.signKey.encoded, back.signKey.encoded)
+        assertArrayEquals(base.resc.encoded, back.groupKey.encoded)
+        // The JSON form kept in the phone's encrypted storage also round-trips.
+        assertTrue(Credentials.verify(pinned, RescuerBundle.decode(back.encode()), now))
         expectThrows<CryptoException> { Credentials.fromQr(qr, "1234".toCharArray()) }
         expectThrows<FormatException> { Credentials.fromQr("UMP1:abc", "1234".toCharArray()) }
         expectThrows<IllegalArgumentException> { Credentials.toQr(bundle, "12".toCharArray()) }

@@ -583,8 +583,13 @@ class BaseBrain(private val ctx: Context) {
 
     private fun periodic() {
         val now = System.currentTimeMillis()
-        // Re-rank open cases (waiting time raises urgency).
-        store.cases.edit { list -> list.map { if (it.isOpen) score(it, now) else it } }
+        // Re-rank open cases (waiting time raises urgency); save only when something changed.
+        val changed = store.cases.value.filter { it.isOpen }.map { score(it, now) }
+            .filter { n -> store.cases.value.firstOrNull { it.caseId == n.caseId }?.let { it.score != n.score || it.label != n.label } == true }
+            .associateBy { it.caseId }
+        if (changed.isNotEmpty()) {
+            store.cases.edit { list -> list.map { c -> changed[c.caseId]?.let { n -> c.copy(score = n.score, label = n.label, modelScore = n.modelScore, reasons = n.reasons, proba = n.proba) } ?: c } }
+        }
         if (Graph.prefs.now.autoAssign) autoAssign()
         // Keep the base's own GPS position fresh for ETAs.
         if (Graph.loc.ageMs() > 5 * 60_000) Graph.loc.requestOnce(30_000) { }

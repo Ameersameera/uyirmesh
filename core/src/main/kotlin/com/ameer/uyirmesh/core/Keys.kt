@@ -1,8 +1,13 @@
 package com.ameer.uyirmesh.core
 
+import java.math.BigInteger
+import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
+import java.security.spec.ECPrivateKeySpec
 
 /**
  * Public keys of the rescue side, built into the app (key pinning):
@@ -184,7 +189,25 @@ class RescuerBundle(
         )
     )
 
+    /** Compact binary form used inside the QR code (keeps the QR small and easy to scan). */
+    fun toBytes(): ByteArray = ByteWriter(400).raw(MAGIC).bytes16(cert.encode())
+        .raw(EcKeys.scalar(signKey)).raw(teamKey).raw(EcKeys.scalar(groupKey)).toByteArray()
+
     companion object {
+        private val MAGIC = "RB3".toByteArray(Charsets.US_ASCII)
+
+        fun fromBytes(b: ByteArray): RescuerBundle {
+            val r = ByteReader(b)
+            if (!r.raw(3).contentEquals(MAGIC)) throw FormatException("Not a rescuer ID")
+            val cert = RescuerCert.decode(r.bytes16())
+            val params = (cert.pub as ECPublicKey).params
+            val signKey = EcKeys.privateFromScalar(r.raw(32), params)
+            val teamKey = r.raw(32)
+            val groupKey = EcKeys.privateFromScalar(r.raw(32), params)
+            if (r.remaining != 0) throw FormatException("Trailing bytes in rescuer ID")
+            return RescuerBundle(cert, signKey, teamKey, groupKey)
+        }
+
         fun decode(text: String): RescuerBundle {
             val m = Json.parseObject(text)
             val teamKey = B64.decode(m.str("tk"))
@@ -199,8 +222,28 @@ class RescuerBundle(
     }
 }
 
+/** Raw P-256 private key scalars (32 bytes) for compact storage in QR codes. */
+object EcKeys {
+    fun scalar(priv: PrivateKey): ByteArray {
+        val s = (priv as? ECPrivateKey)?.s ?: throw CryptoException("Not an EC private key")
+        val raw = s.toByteArray()
+        return when {
+            raw.size == 32 -> raw
+            raw.size == 33 && raw[0] == 0.toByte() -> raw.copyOfRange(1, 33)
+            raw.size < 32 -> ByteArray(32 - raw.size) + raw
+            else -> throw CryptoException("Bad EC private key")
+        }
+    }
+
+    fun privateFromScalar(s: ByteArray, params: java.security.spec.ECParameterSpec): PrivateKey = try {
+        KeyFactory.getInstance("EC").generatePrivate(ECPrivateKeySpec(BigInteger(1, s), params))
+    } catch (e: Exception) {
+        throw CryptoException("Bad private key", e)
+    }
+}
+
 object Credentials {
-    private const val PREFIX = "UMR2:"
+    private const val PREFIX = "UMR3:"
     private const val QR_ITERATIONS = 60_000
 
     /** Creates a rescuer ID on the base phone. [teamKey] must be the 32-byte key of [team]. */
@@ -241,7 +284,7 @@ object Credentials {
 
     fun toQr(b: RescuerBundle, pin: CharArray): String {
         require(pin.size >= 4) { "PIN must have at least 4 digits" }
-        return PREFIX + B64.encodeUrl(Crypto.passwordSeal(pin, b.encode().toByteArray(Charsets.UTF_8), QR_ITERATIONS))
+        return PREFIX + B64.encodeUrl(Crypto.passwordSeal(pin, b.toBytes(), QR_ITERATIONS))
     }
 
     fun isCredentialQr(text: String): Boolean = text.trim().startsWith(PREFIX)
@@ -251,6 +294,6 @@ object Credentials {
         val t = text.trim()
         if (!isCredentialQr(t)) throw FormatException("Not a UyirMesh rescuer QR code")
         val plain = Crypto.passwordOpen(pin, B64.decodeUrl(t.removePrefix(PREFIX)))
-        return RescuerBundle.decode(String(plain, Charsets.UTF_8))
+        return RescuerBundle.fromBytes(plain)
     }
 }

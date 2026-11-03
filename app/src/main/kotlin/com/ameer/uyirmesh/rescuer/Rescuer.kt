@@ -60,7 +60,7 @@ class Rescuer(private val ctx: Context) {
     fun start() {
         scope.launch {
             delay(5_000)
-            if (bundle() != null && Graph.prefs.now.role == Roles.RESCUER) Graph.loc.startTracking(30_000)
+            if (bundle() != null && Graph.prefs.now.role == Roles.RESCUER) Graph.loc.startTracking("rescuer", 30_000)
             while (true) {
                 try {
                     tick()
@@ -105,7 +105,7 @@ class Rescuer(private val ctx: Context) {
         lastActive = System.currentTimeMillis()
         Graph.prefs.update { it.copy(role = Roles.RESCUER, name = it.name.ifBlank { b.cert.name }) }
         Graph.mesh.onRoleChanged()
-        Graph.loc.startTracking(30_000)
+        Graph.loc.startTracking("rescuer", 30_000)
         Graph.log("RESCUER", "Logged in as ${b.cert.name}, team ${b.cert.team} (ID signed by base ${Graph.pinned.sigFingerprint})")
     }
 
@@ -148,13 +148,18 @@ class Rescuer(private val ctx: Context) {
         store.clearRole(Roles.RESCUER)
         Graph.prefs.update { it.copy(role = Roles.PUBLIC) }
         Graph.mesh.onRoleChanged()
-        Graph.loc.stopAll()
+        Graph.loc.stopTracking("rescuer")
         Graph.log("RESCUER", "Logged out")
     }
 
     private fun tick() {
-        val b = bundle() ?: return
-        if (Graph.prefs.now.role != Roles.RESCUER) return
+        val b = bundle()
+        if (b == null || Graph.prefs.now.role != Roles.RESCUER) {
+            // Not on duty (logged out or switched to public mode): no breadcrumb GPS.
+            Graph.loc.stopTracking("rescuer")
+            return
+        }
+        Graph.loc.startTracking("rescuer", 30_000)
         checkAutoLock()
         val l = Graph.loc.last ?: return
         val last = store.crumbs.value.lastOrNull()

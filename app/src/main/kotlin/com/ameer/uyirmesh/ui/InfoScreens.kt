@@ -108,7 +108,7 @@ fun SheltersScreen(nav: Nav) {
     val me = Graph.loc.lastLatLon
     val now = System.currentTimeMillis()
     val shelters = alerts.filter { it.kind == AlertKind.SHELTER }
-    val zones = alerts.filter { (it.kind == AlertKind.DANGER || it.kind == AlertKind.EVACUATE) && it.isValid(now) && it.lat != null }
+    val zones = alerts.filter { (it.kind == AlertKind.DANGER || it.kind == AlertKind.EVACUATE) && it.isValid(now) && it.lat != null && it.lon != null }
     Scaffold(topBar = { ScreenBar(tr("shelters"), { nav.back() }) }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
             item {

@@ -100,46 +100,58 @@ class Loc(private val ctx: Context) {
         }
     }
 
-    /** Keeps the GPS on while someone needs fresh positions (SOS active, rescuer on duty). */
-    @SuppressLint("MissingPermission")
+    /** Who needs the GPS on (an open SOS, a rescuer on duty) and how often; the shortest interval is used. */
+    private val owners = HashMap<String, Long>()
+    private var activeInterval = 0L
+
+    /** Keeps the GPS on while [owner] needs fresh positions. Calling it again for the same owner does not stack. */
     @Synchronized
-    fun startTracking(intervalMs: Long) {
+    fun startTracking(owner: String, intervalMs: Long) {
         if (!Perms.hasLocation(ctx)) return
-        trackers++
-        if (trackers > 1) return
+        owners[owner] = intervalMs
+        applyTracking()
+    }
+
+    @Synchronized
+    fun stopTracking(owner: String) {
+        if (owners.remove(owner) == null) return
+        applyTracking()
+    }
+
+    @Synchronized
+    fun stopAll() {
+        owners.clear()
+        applyTracking()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun applyTracking() {
+        val want = owners.values.minOrNull() ?: 0L
+        if (want == activeInterval) return
+        if (activeInterval != 0L) {
+            try {
+                fused.removeLocationUpdates(fusedCallback)
+            } catch (_: Exception) {
+            }
+            try {
+                lm.removeUpdates(gpsListener)
+            } catch (_: Exception) {
+            }
+        }
+        activeInterval = want
+        if (want == 0L) return
         try {
-            val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
-                .setMinUpdateIntervalMillis(intervalMs / 2)
+            val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, want)
+                .setMinUpdateIntervalMillis(want / 2)
                 .build()
             fused.requestLocationUpdates(req, fusedCallback, Looper.getMainLooper())
         } catch (_: Exception) {
         }
         try {
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, intervalMs, 5f, gpsListener, Looper.getMainLooper())
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, want, 5f, gpsListener, Looper.getMainLooper())
             }
         } catch (_: Exception) {
         }
-    }
-
-    @Synchronized
-    fun stopTracking() {
-        if (trackers == 0) return
-        trackers--
-        if (trackers > 0) return
-        try {
-            fused.removeLocationUpdates(fusedCallback)
-        } catch (_: Exception) {
-        }
-        try {
-            lm.removeUpdates(gpsListener)
-        } catch (_: Exception) {
-        }
-    }
-
-    @Synchronized
-    fun stopAll() {
-        trackers = 1
-        stopTracking()
     }
 }

@@ -14,10 +14,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        ndk {
-            // Every phone sold in the last ten years uses one of these.
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -34,9 +31,13 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
+            // Every phone sold in the last ten years uses one of these.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
         debug {
             signingConfig = signingConfigs.getByName("release")
+            // x86_64 too, for the emulator smoke test in CI.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         }
     }
 
@@ -63,6 +64,10 @@ android {
     lint {
         abortOnError = false
         checkReleaseBuilds = false
+    }
+
+    testOptions {
+        animationsDisabled = true
     }
 }
 
@@ -98,4 +103,12 @@ dependencies {
     // Offline speech recognition for the "help help" voice SOS
     implementation("net.java.dev.jna:jna:5.18.1@aar")
     implementation("com.alphacephei:vosk-android:0.3.75@aar")
+
+    // On-device smoke test (runs on an emulator in CI)
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.09.02"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

@@ -2,6 +2,7 @@ package com.ameer.uyirmesh
 
 import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import com.ameer.uyirmesh.base.BaseBrain
 import com.ameer.uyirmesh.core.PinnedBaseKeys
 import com.ameer.uyirmesh.data.LogEntry
@@ -20,6 +21,7 @@ import com.ameer.uyirmesh.util.Loc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -83,6 +85,17 @@ object Graph {
         base.start()
         rescuer.start()
         victim.start()
+        // Settings that change what the mesh does (role, hops, drill, battery saver) apply at once,
+        // even while the background service is stopped.
+        scope.launch {
+            prefs.settings.collect {
+                try {
+                    mesh.applyRole()
+                } catch (e: Exception) {
+                    note("apply settings", e)
+                }
+            }
+        }
     }
 
     fun log(tag: String, text: String) {
@@ -97,5 +110,14 @@ object Graph {
 
     fun onPeersChanged(n: Int) {
         _peerCount.value = n
+    }
+
+    /**
+     * Only for the on-device smoke test: trust a generated test base instead of the real one, so the test can
+     * play the base, rescuers and victims with keys it made itself (the real base private key is never in the repo).
+     */
+    @VisibleForTesting
+    fun usePinnedForTest(keys: PinnedBaseKeys) {
+        pinned = keys
     }
 }

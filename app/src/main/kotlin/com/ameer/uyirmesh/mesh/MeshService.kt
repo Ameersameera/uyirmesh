@@ -127,7 +127,9 @@ class MeshService : LifecycleService() {
     private fun applySettings() {
         val s = Graph.prefs.now
         Graph.mesh.applyRole()
-        // Voice SOS
+        // Voice SOS. If it was switched on after the service started (settings, leaving base mode),
+        // add the microphone type to the running service first; this works while the app is open.
+        if (voiceWanted() && Perms.hasMic(this) && !micAllowed() && foregroundStart) goForeground(fromForeground = true)
         if (voiceWanted() && Perms.hasMic(this) && micAllowed()) {
             if (voice == null) voice = VoiceTrigger(this) { Graph.trigger.start(Triggers.VOICE) }.also { it.start() }
         } else {

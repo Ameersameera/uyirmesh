@@ -13,6 +13,7 @@ import com.ameer.uyirmesh.core.MissingPayload
 import com.ameer.uyirmesh.core.Packet
 import com.ameer.uyirmesh.core.PacketType
 import com.ameer.uyirmesh.core.ReportPayload
+import com.ameer.uyirmesh.core.Roles
 import com.ameer.uyirmesh.core.SafePayload
 import com.ameer.uyirmesh.core.VolunteerPayload
 import com.ameer.uyirmesh.data.AlertItem
@@ -50,7 +51,7 @@ class PublicHub(private val ctx: Context) {
         Graph.mesh.send(p)
         store.safe.add(SafeItem(p.idHex, Graph.prefs.now.deviceId, safe.name, safe.message, safe.lat, safe.lon, safe.place, now, true))
         Graph.log("SAFE", "I'm safe sent${if (place.isNotBlank()) " ($place)" else ""}")
-        if (Graph.base.hasKeys()) Graph.base.onSafe(p, safe)
+        if (Graph.prefs.now.role == Roles.BASE && Graph.base.hasKeys()) Graph.base.onSafe(p, safe)
     }
 
     fun sendReport(kind: String, note: String) {

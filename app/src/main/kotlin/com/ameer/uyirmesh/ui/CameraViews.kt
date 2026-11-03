@@ -49,6 +49,17 @@ private fun unbindCamera(ctx: android.content.Context) {
     }
 }
 
+/** Back camera, or the front one on phones (and tablets) that have no back camera. */
+private fun pickCamera(provider: ProcessCameraProvider): CameraSelector = try {
+    when {
+        provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
+        provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
+        else -> CameraSelector.DEFAULT_BACK_CAMERA
+    }
+} catch (e: Exception) {
+    CameraSelector.DEFAULT_BACK_CAMERA
+}
+
 object Qr {
     /** Black-on-white QR bitmap, one pixel per module (scaled up without smoothing when drawn). */
     fun bitmap(text: String): Bitmap {
@@ -109,7 +120,7 @@ fun QrScanner(modifier: Modifier = Modifier, onResult: (String) -> Unit) {
                         .build()
                     analysis.setAnalyzer(executor) { image -> decode(image, reader, done, onResult, view) }
                     provider.unbindAll()
-                    provider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                    provider.bindToLifecycle(owner, pickCamera(provider), preview, analysis)
                 } catch (e: Exception) {
                     com.ameer.uyirmesh.Graph.note("qr camera", e)
                 }
@@ -181,7 +192,7 @@ fun CameraPreview(modifier: Modifier, holder: PhotoCapture) {
                             .setTargetResolution(Size(1280, 960))
                             .build()
                         provider.unbindAll()
-                        provider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, cap)
+                        provider.bindToLifecycle(owner, pickCamera(provider), preview, cap)
                         holder.capture = cap
                     } catch (e: Exception) {
                         com.ameer.uyirmesh.Graph.note("photo camera", e)

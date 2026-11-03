@@ -55,7 +55,7 @@ class Victim(private val ctx: Context) {
     fun start() {
         scope.launch {
             delay(5_000)
-            if (active() != null) Graph.loc.startTracking(60_000)
+            if (active() != null) Graph.loc.startTracking("sos", 60_000)
             while (true) {
                 try {
                     followUp()
@@ -123,7 +123,7 @@ class Victim(private val ctx: Context) {
         Graph.log("SOS", "SOS ${if (existing != null) "re-sent" else "sent"} (${payload.kind}, ${payload.people} people, trigger $trigger, packet ${packet.shortId}, ${if (loc != null) "with GPS" else "no GPS yet"})")
         Graph.alarm.vibrateSent()
         Notifier.sosStatus(ctx, L.t("sos_sent_title"), L.t("sos_sent_text"), loud = false)
-        Graph.loc.startTracking(60_000)
+        Graph.loc.startTracking("sos", 60_000)
         // Ask for a fresh GPS fix and send it as soon as it arrives.
         scope.launch(Dispatchers.Main) {
             Graph.loc.requestOnce(45_000) { fix ->
@@ -198,8 +198,9 @@ class Victim(private val ctx: Context) {
         Graph.mesh.engine.forgetWhere { it.src == myId && (it.type == PacketType.SOS || it.type == PacketType.SOS_UPDATE || it.type == PacketType.SOS_MEDIA) }
         Graph.mesh.send(Graph.mesh.outbox.sealedRescue(PacketType.SOS_CANCEL, c.toBytes()))
         store.mySos.modify({ it.caseId }, sos.caseId) { it.copy(cancelledAt = now) }
-        Graph.loc.stopTracking()
+        Graph.loc.stopTracking("sos")
         Graph.alarm.stopAll()
+        VoiceNote.discard()
         Notifier.cancel(ctx, Notifier.ID_SOS_STATUS)
         Graph.log("SOS", "SOS cancelled by the user")
     }
@@ -262,7 +263,7 @@ class Victim(private val ctx: Context) {
         Graph.alarm.vibrateReply()
         Graph.log("SOS", "Reply ${ack.status} from $who (verified signature)")
         if (!updated.active) {
-            Graph.loc.stopTracking()
+            Graph.loc.stopTracking("sos")
             val myId = Graph.prefs.now.deviceId
             Graph.mesh.engine.forgetWhere { it.src == myId && (it.type == PacketType.SOS || it.type == PacketType.SOS_UPDATE) }
         }

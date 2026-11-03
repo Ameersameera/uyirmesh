@@ -9,7 +9,9 @@ import com.ameer.uyirmesh.ui.Nav
 import com.ameer.uyirmesh.ui.UyirRoot
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nav: Nav
+    /** The screen back stack (the on-device smoke test reads it). */
+    lateinit var nav: Nav
+        private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

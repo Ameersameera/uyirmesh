@@ -16,6 +16,7 @@ import com.ameer.uyirmesh.core.Packet
 import com.ameer.uyirmesh.core.PacketFlags
 import com.ameer.uyirmesh.core.PacketType
 import com.ameer.uyirmesh.core.ReportPayload
+import com.ameer.uyirmesh.core.Roles
 import com.ameer.uyirmesh.core.SafePayload
 import com.ameer.uyirmesh.core.SosCancel
 import com.ameer.uyirmesh.core.SosMedia
@@ -30,13 +31,16 @@ import com.ameer.uyirmesh.core.VolunteerPayload
 class Router {
     private val myId: String get() = Graph.prefs.now.deviceId
 
+    /** Base work happens only while this phone is in base mode (keys stay stored after "Leave base mode"). */
+    private val isBase: Boolean get() = Graph.prefs.now.role == Roles.BASE && Graph.base.hasKeys()
+
     fun handle(p: Packet) {
         val base = Graph.base
         val rescuer = Graph.rescuer
         when (p.type) {
             PacketType.SOS, PacketType.SOS_UPDATE, PacketType.SOS_MEDIA, PacketType.SOS_CANCEL -> {
                 if (p.flags and PacketFlags.ENC_BASE == 0) return
-                base.keys()?.let { keys ->
+                if (isBase) base.keys()?.let { keys ->
                     val plain = open { Opener.asBase(keys, Graph.pinned, p) } ?: return@let
                     when (p.type) {
                         PacketType.SOS -> base.onSos(p, SosPayload.fromBytes(plain))
@@ -76,20 +80,20 @@ class Router {
             PacketType.SAFE -> {
                 val safe = SafePayload.fromBytes(p.payload)
                 Graph.public.onSafe(p, safe)
-                if (base.hasKeys()) base.onSafe(p, safe)
+                if (isBase) base.onSafe(p, safe)
             }
             PacketType.REPORT -> Graph.public.onReport(p, ReportPayload.fromBytes(p.payload))
             PacketType.MISSING -> Graph.public.onMissing(p, MissingPayload.fromBytes(p.payload))
 
-            PacketType.VOLUNTEER -> base.keys()?.let { keys ->
+            PacketType.VOLUNTEER -> if (isBase) base.keys()?.let { keys ->
                 open { Opener.asBase(keys, Graph.pinned, p) }?.let { base.onVolunteer(p, VolunteerPayload.fromBytes(it)) }
             }
 
-            PacketType.HEARTBEAT -> base.keys()?.let { keys ->
+            PacketType.HEARTBEAT -> if (isBase) base.keys()?.let { keys ->
                 open { Opener.asBase(keys, Graph.pinned, p) }?.let { base.onHeartbeat(p.src, HeartbeatPayload.fromBytes(it), p.hops) }
             }
 
-            PacketType.FIND_REQUEST -> if (base.hasKeys()) base.onFindRequest(p, FindRequest.fromBytes(p.payload))
+            PacketType.FIND_REQUEST -> if (isBase) base.onFindRequest(p, FindRequest.fromBytes(p.payload))
 
             PacketType.FIND_RESULT -> {
                 if (p.dst != myId || !Authenticity.isBaseSigned(Graph.pinned, p)) return
@@ -109,7 +113,7 @@ class Router {
                 teamKey(team)?.let { key ->
                     open { Opener.team(key, p) }?.let { plain ->
                         val st = TaskStatusPayload.fromBytes(plain)
-                        if (base.hasKeys()) base.onTaskStatus(p, st)
+                        if (isBase) base.onTaskStatus(p, st)
                         if (rescuer.bundle() != null) rescuer.onTeammateStatus(p, st)
                     }
                 }
@@ -122,7 +126,7 @@ class Router {
                     open { Opener.team(key, p) }?.let { plain ->
                         val msg = TeamChatPayload.fromBytes(plain)
                         if (rescuer.bundle() != null) rescuer.onTeamChat(p, msg)
-                        if (base.hasKeys()) base.onTeamChat(p, team, msg)
+                        if (isBase) base.onTeamChat(p, team, msg)
                     }
                 }
             }
@@ -131,7 +135,7 @@ class Router {
 
     private fun teamKey(team: String): ByteArray? {
         Graph.rescuer.bundle()?.let { if (it.cert.team == team) return it.teamKey }
-        return if (Graph.base.hasKeys()) Graph.base.teamKey(team, create = false) else null
+        return if (isBase) Graph.base.teamKey(team, create = false) else null
     }
 
     private inline fun open(block: () -> ByteArray): ByteArray? = try {
