@@ -1,0 +1,2425 @@
+[
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "FOOD",
+    "BOAT"
+   ],
+   "battery": 59
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   59
+  ],
+  "proba": [
+   0.01625244,
+   0.50945447,
+   0.44082995,
+   0.03346314
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 4,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 56
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   4,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   56
+  ],
+  "proba": [
+   0.75694683,
+   0.22468199,
+   0.0173241,
+   0.00104707
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 2,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 48
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   2,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   48
+  ],
+  "proba": [
+   0.00284211,
+   0.11025383,
+   0.69356348,
+   0.19334058
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [],
+   "battery": 10
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   10
+  ],
+  "proba": [
+   0.00015326,
+   0.01399296,
+   0.21476099,
+   0.7710928
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 1,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 85
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   85
+  ],
+  "proba": [
+   0.11384987,
+   0.80188447,
+   0.08094646,
+   0.00331919
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 3,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": -1
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   3,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   50
+  ],
+  "proba": [
+   0.78684142,
+   0.18787735,
+   0.02157812,
+   0.00370312
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [],
+   "battery": 85
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   3,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   85
+  ],
+  "proba": [
+   0.8199425,
+   0.15370125,
+   0.02584642,
+   0.00050983
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 1,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 1,
+   "injured": true,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": -1
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   1,
+   1,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   50
+  ],
+  "proba": [
+   0.0,
+   0.03654623,
+   0.18949799,
+   0.77395578
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 4,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD",
+    "BOAT"
+   ],
+   "battery": 16
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   4,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   16
+  ],
+  "proba": [
+   0.01219553,
+   0.52665924,
+   0.41234773,
+   0.0487975
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 4,
+   "children": 2,
+   "elderly": 0,
+   "disabled": 1,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 52
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   4,
+   2,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   52
+  ],
+  "proba": [
+   0.0,
+   0.00195781,
+   0.08672175,
+   0.91132043
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 1,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 13
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   13
+  ],
+  "proba": [
+   0.03774679,
+   0.58140224,
+   0.33913077,
+   0.0417202
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 3,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 97
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   3,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   97
+  ],
+  "proba": [
+   0.02597448,
+   0.57886538,
+   0.34562089,
+   0.04953925
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 1,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "MEDICINE",
+    "BOAT"
+   ],
+   "battery": 58
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   58
+  ],
+  "proba": [
+   0.0141226,
+   0.46910596,
+   0.47023327,
+   0.04653817
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 4,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 1,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 94
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   4,
+   1,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   94
+  ],
+  "proba": [
+   0.04504465,
+   0.27043287,
+   0.57078457,
+   0.11373791
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 3,
+   "children": 1,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": 37
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   3,
+   1,
+   1,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   37
+  ],
+  "proba": [
+   0.0,
+   0.00611331,
+   0.19827202,
+   0.79561468
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "FOOD",
+    "BOAT"
+   ],
+   "battery": 33
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   33
+  ],
+  "proba": [
+   0.01625244,
+   0.50945447,
+   0.44082995,
+   0.03346314
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 4,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BOAT"
+   ],
+   "battery": 91
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   4,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   91
+  ],
+  "proba": [
+   0.00412498,
+   0.21145707,
+   0.66152161,
+   0.12289634
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 1,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": 14
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   14
+  ],
+  "proba": [
+   0.03282363,
+   0.54479679,
+   0.38196865,
+   0.04041094
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 5,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [],
+   "battery": 46
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   5,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   46
+  ],
+  "proba": [
+   0.00032504,
+   0.04727872,
+   0.39988126,
+   0.55251498
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 6,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 1,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "MEDICINE",
+    "BOAT"
+   ],
+   "battery": 65
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   6,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   65
+  ],
+  "proba": [
+   0.00421386,
+   0.14274167,
+   0.6690087,
+   0.18403577
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 5,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 2,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 18
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   5,
+   0,
+   1,
+   2,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   18
+  ],
+  "proba": [
+   0.0024877,
+   0.12010098,
+   0.69351281,
+   0.18389851
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "FOOD",
+    "BOAT"
+   ],
+   "battery": 18
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   18
+  ],
+  "proba": [
+   0.00334077,
+   0.32513762,
+   0.62151851,
+   0.05000311
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 4,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BABY_FOOD"
+   ],
+   "battery": 27
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   4,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   27
+  ],
+  "proba": [
+   0.82061083,
+   0.17156213,
+   0.00742704,
+   0.0004
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 4,
+   "children": 1,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 53
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   4,
+   1,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   53
+  ],
+  "proba": [
+   0.0,
+   0.00465187,
+   0.0385136,
+   0.95683454
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 2,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [],
+   "battery": 71
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   2,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   71
+  ],
+  "proba": [
+   0.0301522,
+   0.65962838,
+   0.28130422,
+   0.02891521
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 2,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 1,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD",
+    "BABY_FOOD"
+   ],
+   "battery": 69
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   2,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   69
+  ],
+  "proba": [
+   0.01522319,
+   0.52630784,
+   0.42795898,
+   0.03051
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 1,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": 13
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   13
+  ],
+  "proba": [
+   0.00608359,
+   0.45430245,
+   0.49610496,
+   0.04350899
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 1,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "BABY_FOOD"
+   ],
+   "battery": 7
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   7
+  ],
+  "proba": [
+   0.0247078,
+   0.60975088,
+   0.3483488,
+   0.01719252
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 1,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "FOOD",
+    "BABY_FOOD"
+   ],
+   "battery": 94
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   1,
+   0,
+   94
+  ],
+  "proba": [
+   0.86921202,
+   0.12220087,
+   0.00858711,
+   0.0
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 5,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BOAT"
+   ],
+   "battery": 71
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   5,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   71
+  ],
+  "proba": [
+   0.01211339,
+   0.36498366,
+   0.56725442,
+   0.05564853
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 5,
+   "children": 1,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 25
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   5,
+   1,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   25
+  ],
+  "proba": [
+   0.0,
+   0.00518226,
+   0.03616738,
+   0.95865036
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 2,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 1,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BOAT"
+   ],
+   "battery": 44
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   2,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   44
+  ],
+  "proba": [
+   0.68012435,
+   0.27749482,
+   0.04097556,
+   0.00140527
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 2,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 81
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   2,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   81
+  ],
+  "proba": [
+   0.01315487,
+   0.42098539,
+   0.53407806,
+   0.03178169
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 4,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 78
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   4,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   78
+  ],
+  "proba": [
+   0.02501294,
+   0.45950386,
+   0.43608036,
+   0.07940284
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 2,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 60
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   2,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   60
+  ],
+  "proba": [
+   0.00108991,
+   0.06482584,
+   0.72219774,
+   0.21188652
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "FOOD",
+    "MEDICINE"
+   ],
+   "battery": -1
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   1,
+   0,
+   0,
+   50
+  ],
+  "proba": [
+   0.04516273,
+   0.60999311,
+   0.31919746,
+   0.0256467
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 1,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": 63
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   63
+  ],
+  "proba": [
+   0.00213656,
+   0.11020959,
+   0.74549029,
+   0.14216356
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 4,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD",
+    "BABY_FOOD"
+   ],
+   "battery": 94
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   4,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   94
+  ],
+  "proba": [
+   0.02184948,
+   0.4195599,
+   0.45265796,
+   0.10593266
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 5,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BOAT"
+   ],
+   "battery": 99
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   5,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   99
+  ],
+  "proba": [
+   0.0235973,
+   0.43916311,
+   0.49790903,
+   0.03933056
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 2,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD",
+    "BOAT"
+   ],
+   "battery": 5
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   2,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   5
+  ],
+  "proba": [
+   0.00250194,
+   0.27811417,
+   0.65066474,
+   0.06871914
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 69
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   69
+  ],
+  "proba": [
+   0.02791216,
+   0.54126319,
+   0.37651951,
+   0.05430514
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BOAT"
+   ],
+   "battery": 57
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   57
+  ],
+  "proba": [
+   0.0109673,
+   0.4761816,
+   0.48177287,
+   0.03107824
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER",
+    "MEDICINE",
+    "BABY_FOOD"
+   ],
+   "battery": 72
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   1,
+   1,
+   0,
+   72
+  ],
+  "proba": [
+   0.0,
+   0.01213883,
+   0.12151613,
+   0.86634504
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 1,
+   "injured": false,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": -1
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   50
+  ],
+  "proba": [
+   0.06725861,
+   0.6133835,
+   0.2947567,
+   0.02460119
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 3,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "FOOD"
+   ],
+   "battery": 24
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   3,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   24
+  ],
+  "proba": [
+   0.06565178,
+   0.43370775,
+   0.44754284,
+   0.05309763
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 96
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   96
+  ],
+  "proba": [
+   0.0,
+   0.01322626,
+   0.21887761,
+   0.76789613
+  ]
+ },
+ {
+  "input": {
+   "kind": "FIRE",
+   "people": 3,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 19
+  },
+  "x": [
+   0,
+   0,
+   1,
+   0,
+   0,
+   3,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   19
+  ],
+  "proba": [
+   0.00026667,
+   0.01705633,
+   0.29860503,
+   0.68407197
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 2,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [],
+   "battery": 92
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   2,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   92
+  ],
+  "proba": [
+   0.027432,
+   0.73146649,
+   0.21286244,
+   0.02823907
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 1,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "BOAT"
+   ],
+   "battery": 20
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   20
+  ],
+  "proba": [
+   0.02412679,
+   0.63268996,
+   0.32665087,
+   0.01653238
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 2,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 29
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   2,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   29
+  ],
+  "proba": [
+   0.00284211,
+   0.11319208,
+   0.69061199,
+   0.19335381
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 4,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 1,
+   "injured": false,
+   "needs": [
+    "FOOD",
+    "MEDICINE"
+   ],
+   "battery": 16
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   4,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   16
+  ],
+  "proba": [
+   0.4599081,
+   0.39176923,
+   0.14680751,
+   0.00151515
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 1,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 91
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   91
+  ],
+  "proba": [
+   0.02860806,
+   0.67476048,
+   0.26514923,
+   0.03148223
+  ]
+ },
+ {
+  "input": {
+   "kind": "NEED",
+   "people": 1,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER",
+    "FOOD"
+   ],
+   "battery": 66
+  },
+  "x": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   66
+  ],
+  "proba": [
+   0.88145914,
+   0.11030751,
+   0.00823335,
+   0.0
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 3,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [],
+   "battery": 41
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   3,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   41
+  ],
+  "proba": [
+   0.03650135,
+   0.76953571,
+   0.17532326,
+   0.01863967
+  ]
+ },
+ {
+  "input": {
+   "kind": "MEDICAL",
+   "people": 3,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "MEDICINE"
+   ],
+   "battery": 67
+  },
+  "x": [
+   0,
+   1,
+   0,
+   0,
+   0,
+   3,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   67
+  ],
+  "proba": [
+   0.00153554,
+   0.15536459,
+   0.71212485,
+   0.13097502
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 2,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 1,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 35
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   2,
+   1,
+   0,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   35
+  ],
+  "proba": [
+   0.03972722,
+   0.60571233,
+   0.33204144,
+   0.022519
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 4,
+   "children": 0,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER",
+    "MEDICINE",
+    "BABY_FOOD"
+   ],
+   "battery": 91
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   4,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   1,
+   1,
+   0,
+   91
+  ],
+  "proba": [
+   0.0,
+   0.03913585,
+   0.32176579,
+   0.63909836
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 1,
+   "children": 0,
+   "elderly": 1,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER",
+    "FOOD",
+    "BABY_FOOD",
+    "BOAT"
+   ],
+   "battery": 21
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   0,
+   1,
+   1,
+   1,
+   0,
+   1,
+   1,
+   21
+  ],
+  "proba": [
+   0.00801587,
+   0.06884191,
+   0.52748734,
+   0.39565488
+  ]
+ },
+ {
+  "input": {
+   "kind": "TRAPPED",
+   "people": 1,
+   "children": 1,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": true,
+   "needs": [
+    "WATER"
+   ],
+   "battery": 99
+  },
+  "x": [
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   99
+  ],
+  "proba": [
+   0.00188957,
+   0.09937759,
+   0.52270609,
+   0.37602675
+  ]
+ },
+ {
+  "input": {
+   "kind": "FLOOD",
+   "people": 5,
+   "children": 2,
+   "elderly": 0,
+   "disabled": 0,
+   "pregnant": 0,
+   "injured": false,
+   "needs": [
+    "MEDICINE",
+    "BABY_FOOD"
+   ],
+   "battery": 27
+  },
+  "x": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   5,
+   2,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   27
+  ],
+  "proba": [
+   0.0042114,
+   0.21300795,
+   0.66213875,
+   0.1206419
+  ]
+ }
+]

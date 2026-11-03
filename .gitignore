@@ -1,0 +1,15 @@
+.gradle/
+build/
+/local.properties
+.idea/
+*.iml
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+# Speech model is downloaded by CI (see .github/workflows/build-apk.yml)
+app/src/main/assets/model/
+localtest/build/
+# Never commit private keys
+*.key
+__pycache__/
