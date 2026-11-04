@@ -76,15 +76,16 @@ object Authenticity {
     fun check(pinned: PinnedBaseKeys, p: Packet, now: Long): Boolean = when (p.type) {
         PacketType.ALERT, PacketType.TASK, PacketType.FIND_RESULT -> isBaseSigned(pinned, p)
         PacketType.ACK -> isBaseSigned(pinned, p) || rescuerSigner(pinned, p, now) != null
+        PacketType.PROGRESS -> rescuerSigner(pinned, p, now) != null
         else -> true
     }
 
     fun isBaseSigned(pinned: PinnedBaseKeys, p: Packet): Boolean =
         (p.flags and PacketFlags.SIGNED) != 0 && Crypto.verifyPacket(pinned.sig, p)
 
-    /** For a reply signed by a rescuer: the rescuer's verified certificate, or null. */
+    /** For a reply or distance update signed by a rescuer: the rescuer's verified certificate, or null. */
     fun rescuerSigner(pinned: PinnedBaseKeys, p: Packet, now: Long): RescuerCert? {
-        if (p.type != PacketType.ACK || (p.flags and PacketFlags.SIGNED) == 0) return null
+        if ((p.type != PacketType.ACK && p.type != PacketType.PROGRESS) || (p.flags and PacketFlags.SIGNED) == 0) return null
         val ack = try {
             AckPayload.fromBytes(p.payload)
         } catch (e: Exception) {

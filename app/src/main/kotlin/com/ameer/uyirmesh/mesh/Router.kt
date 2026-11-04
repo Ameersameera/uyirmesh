@@ -71,6 +71,13 @@ class Router {
                 Graph.victim.onReply(p, ack, by)
             }
 
+            PacketType.PROGRESS -> {
+                // A rescuer on the way says how far away they are; only a base-issued rescuer ID can sign it.
+                if (p.dst != myId) return
+                val signer = Authenticity.rescuerSigner(Graph.pinned, p, System.currentTimeMillis()) ?: return
+                Graph.victim.onProgress(AckPayload.fromBytes(p.payload), signer.name)
+            }
+
             PacketType.ALERT -> {
                 if (!Authenticity.isBaseSigned(Graph.pinned, p)) return
                 Graph.public.onAlert(p, AlertPayload.fromBytes(p.payload))

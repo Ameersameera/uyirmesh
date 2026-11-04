@@ -73,6 +73,12 @@ data class MySos(
     val replies: List<SosReply> = emptyList(),
     val voiceSent: Int = 0,
     val photoSent: Int = 0,
+    /** Latest distance a rescuer on the way reported (metres), -1 if none yet. */
+    val helpDistanceM: Int = -1,
+    val helpEtaMin: Int = -1,
+    /** When that rescuer's phone sent it (its clock), and who it was. */
+    val helpAt: Long = 0,
+    val helpBy: String = "",
 ) {
     val active: Boolean get() = rescuedAt == 0L && cancelledAt == 0L
 
@@ -81,7 +87,7 @@ data class MySos(
         "ha" to handedAt, "ht" to handedTo, "ba" to baseAt, "bh" to baseHops, "aa" to assignedAt, "tm" to team,
         "e" to etaMin, "ow" to onWayAt, "rs" to rescuer, "ra" to rescuedAt, "ca" to cancelledAt, "lu" to lastUpdateAt,
         "us" to updatesSent, "lb" to lowBatterySent, "rp" to replies.map { it.toJson() }, "vs" to voiceSent,
-        "ps" to photoSent,
+        "ps" to photoSent, "hd" to helpDistanceM, "he" to helpEtaMin, "hs" to helpAt, "hb" to helpBy,
     )
 
     companion object {
@@ -89,7 +95,8 @@ data class MySos(
             m.str("c"), SosPayload.fromJson(m.obj("p")), m.str("cs"), m.str("pk"), m.long("sa"), m.bool("dr"),
             m.long("ha"), m.int("ht"), m.long("ba"), m.int("bh", -1), m.long("aa"), m.str("tm"), m.int("e", -1),
             m.long("ow"), m.str("rs"), m.long("ra"), m.long("ca"), m.long("lu"), m.int("us"), m.bool("lb"),
-            m.objs("rp").map { SosReply.from(it) }, m.int("vs"), m.int("ps"),
+            m.objs("rp").map { SosReply.from(it) }, m.int("vs"), m.int("ps"), m.int("hd", -1), m.int("he", -1),
+            m.long("hs"), m.str("hb"),
         )
     }
 }

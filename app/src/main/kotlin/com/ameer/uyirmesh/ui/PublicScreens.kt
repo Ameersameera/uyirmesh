@@ -81,6 +81,7 @@ import com.ameer.uyirmesh.core.Skills
 import com.ameer.uyirmesh.core.Triggers
 import com.ameer.uyirmesh.data.MySos
 import com.ameer.uyirmesh.mesh.PublicHub
+import com.ameer.uyirmesh.rescuer.Rescuer
 import com.ameer.uyirmesh.sos.SosForm
 import com.ameer.uyirmesh.sos.VoiceNote
 import com.ameer.uyirmesh.util.MapsLink
@@ -372,6 +373,7 @@ fun SosStatusScreen(nav: Nav) {
                 Text("${kindLabel(s.payload.kind)} · ${s.payload.people} ${tr("people")} · ${tr("sent")} ${timeText(s.sentAt)}")
                 if (stats.waitingOwn > 0 && s.active) Text(tr("mesh_waiting").replace("{n}", stats.waitingOwn.toString()), color = Palette.Orange, style = MaterialTheme.typography.bodySmall)
             }
+            if (s.active && s.helpDistanceM >= 0) HelpComingCard(nav, s)
             SectionTitle(tr("timeline"))
             TimelineStep(tr("tl_sent"), timeText(s.sentAt), true)
             TimelineStep(tr("tl_handed").replace("{n}", s.handedTo.toString()), timeText(s.handedAt), s.handedAt > 0)
@@ -381,7 +383,9 @@ fun SosStatusScreen(nav: Nav) {
             )
             TimelineStep(tr("tl_assigned") + if (s.team.isNotBlank()) ": ${s.team}" else "", timeText(s.assignedAt), s.assignedAt > 0)
             TimelineStep(
-                tr("tl_on_way") + (if (s.rescuer.isNotBlank()) " - ${s.rescuer}" else "") + if (s.etaMin > 0) " · ETA ${s.etaMin} min" else "",
+                tr("tl_on_way") + (if (s.rescuer.isNotBlank()) " - ${s.rescuer}" else "") +
+                    (if (s.active && s.helpDistanceM >= 0) " · ${Geo.formatDistance(s.helpDistanceM.toDouble())}" else "") +
+                    if (s.etaMin > 0) " · ETA ${s.etaMin} min" else "",
                 timeText(s.onWayAt), s.onWayAt > 0,
             )
             TimelineStep(tr("tl_rescued"), timeText(s.rescuedAt), s.rescuedAt > 0, last = true)
@@ -458,6 +462,30 @@ fun SosStatusScreen(nav: Nav) {
             },
             dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text(tr("keep_sos")) } },
         )
+    }
+}
+
+/** On the victim's SOS screen: how far away the rescuer on the way is (from the rescuer's signed updates). */
+@Composable
+private fun HelpComingCard(nav: Nav, s: MySos) {
+    val ageMin = ((System.currentTimeMillis() - s.helpAt) / 60_000).coerceAtLeast(0)
+    InfoCard(color = Palette.Green.copy(alpha = 0.14f)) {
+        Text(tr("help_coming"), fontWeight = FontWeight.Bold, color = Palette.Green)
+        Text(
+            tr("help_distance").replace("{w}", s.helpBy).replace("{d}", Geo.formatDistance(s.helpDistanceM.toDouble())),
+            fontSize = 24.sp, fontWeight = FontWeight.Black,
+        )
+        Text(
+            (if (s.helpEtaMin > 0) tr("help_eta").replace("{e}", s.helpEtaMin.toString()) + " · " else "") +
+                tr("help_updated").replace("{a}", agoText(s.helpAt)),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (ageMin >= 10) Text(tr("help_old").replace("{n}", ageMin.toString()), color = Palette.Orange, style = MaterialTheme.typography.bodySmall)
+        if (s.helpDistanceM <= Rescuer.NEAR_M) {
+            Text(tr("help_near"), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+            TonalButton(tr("find_me"), Ic.Siren, Modifier.fillMaxWidth().padding(top = 4.dp)) { nav.go("findme") }
+        }
+        Text(tr("help_signed"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
     }
 }
 

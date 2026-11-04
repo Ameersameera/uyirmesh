@@ -56,6 +56,9 @@ messages raise the score. Test accuracy 80.1 %, 99.8 % within one class — see 
 * The base compares each rescuer's distance to the victim now and about 5 minutes earlier: getting closer,
   moving at the same distance, not moving for N minutes, moving away, or reached (within 60 m), with an ETA
   from the measured approach speed. It is near-live (about a minute), not second-by-second.
+* The victim sees "Help is coming: Karthik is 600 m away, about 7 min": the rescuer's phone sends a signed
+  distance update (`PROGRESS` packet, kept one hour by relays) every 2 minutes while on the way, and at once
+  within 150 m, when the victim is asked to shout or use the siren and flashlight.
 * Maps inside the app are offline radar maps (no tiles, no internet). "Navigate in Google Maps" and
   "Open pin in map app" hand the position to the phone's map app with a normal Android link (no API key).
   Without internet, Google Maps shows the map and driving routes only for areas downloaded beforehand

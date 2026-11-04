@@ -213,6 +213,30 @@ class Victim(private val ctx: Context) {
         Graph.log("SOS", "SOS handed to $neighbours nearby phone(s)")
     }
 
+    /**
+     * A rescuer on the way says how far away they are (signed with their rescuer ID, checked by the router).
+     * Updates the SOS screen and the notification quietly; a late copy of an older update is ignored.
+     */
+    fun onProgress(ack: AckPayload, verifiedBy: String) {
+        if (ack.distanceM < 0) return
+        val sos = store.mySos.value.lastOrNull { it.caseId == ack.caseId } ?: return
+        if (!sos.active) return
+        val now = System.currentTimeMillis()
+        val sentAt = ack.at.takeIf { it > 0 } ?: now
+        if (verifiedBy == sos.helpBy && sentAt <= sos.helpAt) return
+        store.mySos.modify({ it.caseId }, sos.caseId) { s ->
+            s.copy(
+                helpDistanceM = ack.distanceM, helpEtaMin = ack.etaMin, helpAt = sentAt, helpBy = verifiedBy,
+                onWayAt = if (s.onWayAt == 0L) now else s.onWayAt, rescuer = s.rescuer.ifBlank { verifiedBy },
+                team = s.team.ifBlank { ack.team }, etaMin = if (ack.etaMin > 0) ack.etaMin else s.etaMin,
+            )
+        } ?: return
+        val text = L.t("help_notify").replace("{w}", verifiedBy).replace("{d}", Geo.formatDistance(ack.distanceM.toDouble()))
+            .replace("{e}", etaText(ack.etaMin))
+        Notifier.sosStatus(ctx, L.t("help_coming"), text, loud = false)
+        Graph.log("SOS", "Rescuer $verifiedBy is ${ack.distanceM} m away (verified signature)")
+    }
+
     fun onReply(p: Packet, ack: AckPayload, verifiedBy: String) {
         val sos = store.mySos.value.lastOrNull { it.caseId == ack.caseId } ?: return
         val now = System.currentTimeMillis()
@@ -238,6 +262,10 @@ class Victim(private val ctx: Context) {
                         etaMin = if (ack.etaMin > 0) ack.etaMin else n.etaMin,
                         rescuer = if (verifiedBy != "BASE") verifiedBy else ack.by.ifBlank { n.rescuer },
                     )
+                    // "On my way" from the rescuer's phone carries how far away the rescuer is.
+                    if (ack.distanceM >= 0 && verifiedBy != "BASE") {
+                        n = n.copy(helpDistanceM = ack.distanceM, helpEtaMin = ack.etaMin, helpAt = ack.at.takeIf { it > 0 } ?: now, helpBy = verifiedBy)
+                    }
                 }
                 AckStatus.RESCUED -> {
                     n = n.copy(rescuedAt = now)

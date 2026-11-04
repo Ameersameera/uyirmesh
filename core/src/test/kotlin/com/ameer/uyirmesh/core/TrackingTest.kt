@@ -134,6 +134,33 @@ class TrackingTest {
     }
 
     @Test
+    fun distanceUpdateForTheVictimMustBeSignedByARescuer() {
+        val pinned = TestUtil.pinned
+        val out = Outbox(Ids.newDeviceId(), pinned) { t0 }
+        val victimId = Ids.newDeviceId()
+        val karthik = Credentials.issue(TestUtil.basePrivate, "Karthik", "ALPHA", Crypto.random(32), t0, 5)
+        val update = AckPayload("c1", AckStatus.ON_THE_WAY, "ALPHA", 7, "", t0, "Karthik", karthik.cert.toBase64(), distanceM = 620)
+        val p = out.signedByRescuer(karthik, PacketType.PROGRESS, update.toBytes(), victimId)
+        assertEquals(2, p.qos) // lower priority than SOS and replies, kept for an hour
+        val relayed = PacketCodec.decode(PacketCodec.encode(p.relayCopy(4)))
+        assertEquals(PacketType.PROGRESS, relayed.type)
+        assertTrue(Authenticity.check(pinned, relayed, t0))
+        assertEquals("Karthik", Authenticity.rescuerSigner(pinned, relayed, t0)?.name)
+        assertEquals(620, AckPayload.fromBytes(relayed.payload).distanceM)
+        // Signed with someone else's key, signed by nobody, or by a rescuer of another base: dropped by every relay.
+        assertFalse(Authenticity.check(pinned, Crypto.signPacket(Crypto.newEcKeyPair().private, out.plain(PacketType.PROGRESS, update.toBytes(), victimId)), t0))
+        assertFalse(Authenticity.check(pinned, out.plain(PacketType.PROGRESS, update.toBytes(), victimId), t0))
+        val otherBase = BasePrivateKeys(Crypto.newEcKeyPair().private, Crypto.newEcKeyPair().private, Crypto.newEcKeyPair().private)
+        val stranger = Credentials.issue(otherBase, "Stranger", "ALPHA", Crypto.random(32), t0, 5)
+        val strangers = update.copy(by = "Stranger", cert = stranger.cert.toBase64())
+        assertFalse(Authenticity.check(pinned, out.signedByRescuer(stranger, PacketType.PROGRESS, strangers.toBytes(), victimId), t0))
+        // The base signs replies, but distance updates come only from rescuers.
+        assertFalse(Authenticity.check(pinned, out.signedByBase(TestUtil.basePrivate, PacketType.PROGRESS, update.toBytes(), victimId), t0))
+        // Replies without a distance (older phones) still parse.
+        assertEquals(-1, AckPayload.fromBytes(AckPayload("c1", AckStatus.RECEIVED).toBytes()).distanceM)
+    }
+
+    @Test
     fun taskStatusCarriesFixTimeAndBattery() {
         val st = TaskStatusPayload("case1", "r-1", "Ravi", "A", TaskState.ON_THE_WAY, 11.66, 78.14, t0, t0 - 5_000, 71)
         val back = TaskStatusPayload.fromBytes(st.toBytes())

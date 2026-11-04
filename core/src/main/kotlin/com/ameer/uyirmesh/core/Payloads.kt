@@ -168,11 +168,13 @@ data class AckPayload(
     val cert: String = "",
     val hops: Int = -1,
     val path: List<String> = emptyList(),
+    /** From a rescuer on the way: metres between the rescuer and the victim, -1 if not known. */
+    val distanceM: Int = -1,
 ) {
     fun toBytes(): ByteArray = Json.toBytes(
         linkedMapOf(
             "c" to caseId, "s" to status, "tm" to team, "e" to etaMin, "m" to message, "t" to at,
-            "by" to by, "rc" to cert, "h" to hops, "pa" to path,
+            "by" to by, "rc" to cert, "h" to hops, "pa" to path, "d" to distanceM,
         )
     )
 
@@ -181,7 +183,7 @@ data class AckPayload(
             val m = Json.objectFromBytes(b)
             return AckPayload(
                 m.str("c"), m.str("s"), m.str("tm"), m.int("e", -1), m.str("m").take(300), m.long("t"),
-                m.str("by").take(60), m.str("rc"), m.int("h", -1), m.strList("pa").take(16),
+                m.str("by").take(60), m.str("rc"), m.int("h", -1), m.strList("pa").take(16), m.int("d", -1),
             )
         }
     }

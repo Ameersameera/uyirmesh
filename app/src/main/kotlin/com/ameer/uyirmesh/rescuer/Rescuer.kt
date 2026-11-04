@@ -39,6 +39,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Rescuer side: log in with the base-signed QR ID and PIN, receive tasks from the base, see every SOS in
@@ -56,6 +57,7 @@ class Rescuer(private val ctx: Context) {
     private val _locked = MutableStateFlow(true)
     val locked: StateFlow<Boolean> = _locked
     @Volatile private var lastActive = 0L
+    private val progressSent = HashMap<String, Pair<Long, Int>>()
 
     fun start() {
         scope.launch {
@@ -167,7 +169,35 @@ class Rescuer(private val ctx: Context) {
         if (last == null || Geo.distanceM(last.lat, last.lon, l.latitude, l.longitude) > 15 || now - last.at > 5 * 60_000) {
             if (Graph.loc.ageMs() < 2 * 60_000) store.crumbs.add(Crumb(l.latitude, l.longitude, now))
         }
+        sendProgress(now)
         if (b.cert.isExpired(now)) Graph.log("RESCUER", "Rescuer ID expired; ask the base for a new one")
+    }
+
+    /**
+     * While on the way, tells each victim how far away this rescuer is, signed with the rescuer ID so it cannot
+     * be faked: every 2 minutes (5 in battery saver), and at once when the rescuer comes within [NEAR_M].
+     */
+    @Synchronized
+    fun sendProgress(now: Long = System.currentTimeMillis()) {
+        val b = bundle() ?: return
+        if (Graph.prefs.now.role != Roles.RESCUER) return
+        val l = Graph.loc.last ?: return
+        if (Graph.loc.ageMs() > 2 * 60_000) return
+        val interval = if (Graph.prefs.now.batterySaver) 5 * 60_000L else 2 * 60_000L
+        val myId = Graph.mesh.engine.myId
+        for (t in store.tasks.value) {
+            if (t.state != TaskState.ON_THE_WAY || t.victim.isBlank() || !Geo.isValid(t.lat, t.lon)) continue
+            val d = Geo.distanceM(l.latitude, l.longitude, t.lat!!, t.lon!!).roundToInt()
+            val last = progressSent[t.caseId]
+            val justCameNear = d <= NEAR_M && (last == null || last.second > NEAR_M)
+            if (last != null && now - last.first < interval && !justCameNear) continue
+            val eta = Geo.etaMinutes(d.toDouble(), Graph.prefs.now.speedKmh.toDouble())
+            val update = AckPayload(t.caseId, AckStatus.ON_THE_WAY, b.cert.team, eta, "", now, b.cert.name, b.cert.toBase64(), distanceM = d)
+            // Older distance updates for this victim are no longer worth spreading.
+            Graph.mesh.engine.forgetWhere { p -> p.type == PacketType.PROGRESS && p.src == myId && p.dst == t.victim }
+            Graph.mesh.send(Graph.mesh.outbox.signedByRescuer(b, PacketType.PROGRESS, update.toBytes(), t.victim, maxOf(Graph.mesh.outbox.ttl, 6)))
+            progressSent[t.caseId] = now to d
+        }
     }
 
     /* ---------------- incoming ---------------- */
@@ -279,11 +309,13 @@ class Rescuer(private val ctx: Context) {
             else -> null
         }
         if (ackStatus != null && t.victim.isNotBlank()) {
-            val eta = if (loc != null && t.lat != null && t.lon != null) {
-                Geo.etaMinutes(Geo.distanceM(loc.latitude, loc.longitude, t.lat, t.lon), Graph.prefs.now.speedKmh.toDouble())
-            } else -1
-            val ack = AckPayload(caseId, ackStatus, b.cert.team, eta, "", now, b.cert.name, b.cert.toBase64())
+            val fresh = loc != null && Graph.loc.ageMs() < 5 * 60_000
+            val d = if (fresh && t.lat != null && t.lon != null) Geo.distanceM(loc!!.latitude, loc.longitude, t.lat, t.lon) else -1.0
+            val eta = if (d >= 0) Geo.etaMinutes(d, Graph.prefs.now.speedKmh.toDouble()) else -1
+            val dist = if (d >= 0 && state == TaskState.ON_THE_WAY) d.roundToInt() else -1
+            val ack = AckPayload(caseId, ackStatus, b.cert.team, eta, "", now, b.cert.name, b.cert.toBase64(), distanceM = dist)
             Graph.mesh.send(Graph.mesh.outbox.signedByRescuer(b, PacketType.ACK, ack.toBytes(), t.victim, maxOf(Graph.mesh.outbox.ttl, 6)))
+            if (dist >= 0) synchronized(this) { progressSent[caseId] = now to dist }
         }
         Graph.log("RESCUER", "Task ${caseId.take(6)}: ${state.lowercase().replace('_', ' ')}")
     }
@@ -319,5 +351,8 @@ class Rescuer(private val ctx: Context) {
         private const val PIN_FILE = "rescuer_pin.json"
         private const val PIN_ITERATIONS = 30_000
         private const val AUTO_LOCK_MS = 5 * 60_000L
+
+        /** Within this distance the victim is told at once (close enough to shout, or to hear a siren). */
+        const val NEAR_M = 150
     }
 }

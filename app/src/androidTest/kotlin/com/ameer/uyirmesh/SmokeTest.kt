@@ -83,7 +83,8 @@ internal fun smokePermissions(): Array<String> = buildList {
  * On-device smoke test (runs on an Android emulator in CI). It uses the app like a person would, and plays the
  * other phones of the mesh by handing the app real encrypted and signed packets, exactly as Nearby would:
  *  1. setup and every public screen (English, Tamil, large text, dark theme, find-me tools)
- *  2. victim: hands-free countdown, SOS form, signed replies from the base and a rescuer, forged reply, cancel
+ *  2. victim: hands-free countdown, SOS form, signed replies from the base and a rescuer, how far away the
+ *     rescuer is (signed updates; late and forged ones ignored), forged reply, cancel
  *  3. base: key file import, login, SOS arriving over a relay, AI priority, rescuer IDs, live tracking of the
  *     team (signed positions, forged ones ignored), alerts, shelters, laptop dashboard over HTTP, CSV/PDF
  *     reports, victim cancel
@@ -248,6 +249,26 @@ class SmokeTest {
         waitUntil("reply from the rescuer") { Graph.victim.active()?.rescuer == "Karthik" }
         assertTrue(Graph.victim.active()!!.onWayAt > 0)
         waitText("Coming by boat")
+
+        // On the way, Karthik's phone keeps telling the victim how far away he is (signed with his rescuer ID).
+        val progress = AckPayload(first.caseId, AckStatus.ON_THE_WAY, "ALPHA", 7, "", now(), "Karthik", karthik.cert.toBase64(), distanceM = 620)
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).signedByRescuer(karthik, PacketType.PROGRESS, progress.toBytes(), me))
+        waitUntil("distance from the rescuer") { Graph.victim.active()?.helpDistanceM == 620 }
+        waitText(en("help_coming"))
+        waitText(en("help_distance").replace("{w}", "Karthik").replace("{d}", "620 m"))
+        // Within 150 m the victim is asked to shout or use the siren and flashlight.
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).signedByRescuer(karthik, PacketType.PROGRESS, progress.copy(distanceM = 120, etaMin = 2, at = now() + 1_000).toBytes(), me))
+        waitUntil("rescuer close") { Graph.victim.active()?.helpDistanceM == 120 }
+        waitText(en("help_near"))
+        // A forged update is dropped by the mesh; a late copy of an older update does not move him back.
+        val forgedUpdates = Graph.mesh.engine.metrics.forgedDrops
+        inject(Crypto.signPacket(Crypto.newEcKeyPair().private, Outbox(Ids.newDeviceId(), TestBase.pinned).plain(PacketType.PROGRESS, progress.copy(distanceM = 5).toBytes(), me)))
+        waitUntil("forged distance dropped") { Graph.mesh.engine.metrics.forgedDrops > forgedUpdates }
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).signedByRescuer(karthik, PacketType.PROGRESS, progress.copy(distanceM = 900, at = now() - 600_000).toBytes(), me))
+        // Packets are handled one after another, so once this chat message is in, the old update was handled too.
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).plain(PacketType.CHAT, ChatPayload("Marker", "after the old update", now()).toBytes(), Destinations.ALL))
+        waitUntil("marker message") { Graph.store.chat.value.any { it.text == "after the old update" } }
+        assertEquals(120, Graph.victim.active()!!.helpDistanceM)
 
         // A forged "rescued" reply (signed with an unknown key) is dropped and changes nothing.
         val forgedBefore = Graph.mesh.engine.metrics.forgedDrops
@@ -617,6 +638,30 @@ class SmokeTest {
         waitUntil("task accepted") { taskOf(baseTask.caseId)?.state == TaskState.ACCEPTED }
         tap(en("on_my_way"))
         waitUntil("on the way") { taskOf(baseTask.caseId)?.state == TaskState.ON_THE_WAY }
+
+        // On the way, this phone tells the victim how far away it is, signed with Priya's rescuer ID.
+        Graph.loc.offer(
+            android.location.Location("smoke-test").apply {
+                latitude = 11.6800 - 100 / 111_195.0
+                longitude = 78.1600
+                accuracy = 5f
+                time = now()
+            },
+        )
+        Graph.rescuer.sendProgress()
+        val updates = ArrayList<Packet>()
+        waitUntil("distance update for the victim") {
+            updates.clear()
+            Graph.mesh.engine.forgetWhere { p ->
+                if (p.type == PacketType.PROGRESS && p.src == myId) updates.add(p)
+                false
+            }
+            updates.isNotEmpty()
+        }
+        val update = updates.maxBy { it.createdAt }
+        assertEquals(baseTask.victimDevice, update.dst)
+        assertEquals("Priya", Authenticity.rescuerSigner(TestBase.pinned, update, now())?.name)
+        assertEquals(100.0, AckPayload.fromBytes(update.payload).distanceM.toDouble(), 5.0)
         tap(en("rescued"))
         waitUntil("rescued") { taskOf(baseTask.caseId)?.state == TaskState.RESCUED }
         back()

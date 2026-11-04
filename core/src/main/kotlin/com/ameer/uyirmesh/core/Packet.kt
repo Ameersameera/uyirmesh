@@ -24,7 +24,10 @@ enum class PacketType(val code: Int, val qos: Int) {
     TEAM_CHAT(14, 2),
     FIND_REQUEST(15, 2),
     FIND_RESULT(16, 1),
-    MISSING(17, 2);
+    MISSING(17, 2),
+
+    /** A rescuer on the way tells the victim how far away they are (rescuer-signed, kept only an hour). */
+    PROGRESS(18, 2);
 
     companion object {
         private val byCode = entries.associateBy { it.code }
