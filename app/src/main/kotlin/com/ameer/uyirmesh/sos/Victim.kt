@@ -1,12 +1,14 @@
 package com.ameer.uyirmesh.sos
 
 import com.ameer.uyirmesh.util.CrashGuard
+import com.ameer.uyirmesh.util.Loc
 import android.content.Context
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.AckPayload
 import com.ameer.uyirmesh.core.AckStatus
 import com.ameer.uyirmesh.core.Crypto
 import com.ameer.uyirmesh.core.EmergencyKind
+import com.ameer.uyirmesh.core.FixChoice
 import com.ameer.uyirmesh.core.Geo
 import com.ameer.uyirmesh.core.Hex
 import com.ameer.uyirmesh.core.Ids
@@ -53,6 +55,16 @@ class Victim(private val ctx: Context) {
     private var lastSosAt = 0L
 
     fun start() {
+        // A clearly better position (e.g. the first GPS fix after a rough network one) goes out at once.
+        scope.launch {
+            Graph.loc.lastFlow.collect {
+                try {
+                    if (it != null) improveLocation()
+                } catch (e: Exception) {
+                    Graph.note("sos better location", e)
+                }
+            }
+        }
         scope.launch {
             delay(5_000)
             if (active() != null) Graph.loc.startTracking("sos", 60_000)
@@ -161,9 +173,36 @@ class Victim(private val ctx: Context) {
         Graph.log("SOS", "Location update sent${if (low) " (battery low, last position)" else ""}")
     }
 
-    private fun followUp() {
+    /**
+     * Sends the position again as soon as it is clearly better than the one the base and rescuers have
+     * (e.g. the first GPS fix after a rough network position, or "precise location" just turned on), or
+     * after moving. The regular update still goes every 2 minutes.
+     */
+    @Synchronized
+    fun improveLocation(now: Long = System.currentTimeMillis()) {
         val sos = active() ?: return
+        val fix = Graph.loc.last ?: return
+        if (now - fix.time > 2 * 60_000) return
+        val p = sos.payload
+        val since = now - maxOf(sos.lastUpdateAt, sos.sentAt)
+        val acc = Loc.accuracyOf(fix)
+        val sentAcc = p.accuracy ?: Double.MAX_VALUE
+        val better = FixChoice.isPrecise(acc) && acc!! < sentAcc / 2
+        val moved = p.lat == null || p.lon == null ||
+            Geo.distanceM(p.lat!!, p.lon!!, fix.latitude, fix.longitude) > maxOf(50.0, 2.0 * (acc ?: 50.0))
+        if ((better && since >= 15_000) || (moved && since >= 60_000)) {
+            sendUpdate(sos, low = false, note = "")
+            Graph.log("SOS", "Sent a better position (${accuracyLabel(acc)})")
+        }
+    }
+
+    private fun accuracyLabel(acc: Double?) = if (acc == null) "accuracy unknown" else "±${acc.toInt()} m"
+
+    private fun followUp() {
+        Graph.loc.ensureGps()
         val now = System.currentTimeMillis()
+        improveLocation(now)
+        val sos = active() ?: return
         val battery = Mesh.batteryPercent(ctx)
         if (battery in 0..5 && !sos.lowBatterySent) {
             sendUpdate(sos, low = true, note = "")

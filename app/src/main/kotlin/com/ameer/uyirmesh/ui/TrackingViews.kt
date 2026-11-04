@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ameer.uyirmesh.base.TeamApproach
+import com.ameer.uyirmesh.core.FixChoice
 import com.ameer.uyirmesh.core.Geo
 import com.ameer.uyirmesh.core.Tracking
 import com.ameer.uyirmesh.util.MapsLink
@@ -39,10 +40,13 @@ fun rememberNow(periodMs: Long = 15_000): Long {
     return now
 }
 
-/** "Navigate in Google Maps" and "Open in map app" for one position. */
+/** "Navigate in Google Maps" and "Open in map app" for one position ([accuracyM]: how exact it is). */
 @Composable
-fun MapButtons(lat: Double, lon: Double, label: String, note: Boolean = true) {
+fun MapButtons(lat: Double, lon: Double, label: String, note: Boolean = true, accuracyM: Double? = null) {
     val ctx = LocalContext.current
+    if (accuracyM != null && accuracyM > FixChoice.PRECISE_M) {
+        Text(tr("pin_approx").replace("{a}", accuracyText(accuracyM)), color = Palette.Orange, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+    }
     Spacer(Modifier.height(6.dp))
     TonalButton(tr("nav_google_maps"), Ic.Navigate, Modifier.fillMaxWidth()) { MapsLink.navigate(ctx, lat, lon, label) }
     Spacer(Modifier.height(6.dp))
@@ -62,8 +66,11 @@ fun trendLabel(a: Tracking.Approach): Pair<String, Color> = when (a.trend) {
 
 /** Base case screen: is each rescuer of the assigned team really on the way to the victim? */
 @Composable
-fun TrackingSection(team: String, hasVictimGps: Boolean, approaches: List<TeamApproach>, now: Long) {
+fun TrackingSection(team: String, hasVictimGps: Boolean, approaches: List<TeamApproach>, now: Long, victimAccuracyM: Double? = null) {
     SectionTitle("${tr("tracking_title")} · ${tr("team")} $team")
+    if (hasVictimGps && victimAccuracyM != null && victimAccuracyM > FixChoice.PRECISE_M && approaches.isNotEmpty()) {
+        Text(tr("tracking_victim_rough").replace("{a}", accuracyText(victimAccuracyM)), color = Palette.Orange, style = MaterialTheme.typography.bodySmall)
+    }
     when {
         !hasVictimGps -> Text(tr("tracking_no_victim_gps"), style = MaterialTheme.typography.bodySmall, color = Palette.Orange)
         approaches.isEmpty() -> Text(tr("tracking_none").replace("{t}", team), style = MaterialTheme.typography.bodySmall)

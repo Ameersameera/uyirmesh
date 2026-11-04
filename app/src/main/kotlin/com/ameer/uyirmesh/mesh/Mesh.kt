@@ -172,7 +172,8 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
         val s = Graph.prefs.now
         val bundle = if (s.role == Roles.RESCUER) Graph.rescuer.bundle() else null
         val shareLoc = s.role != Roles.PUBLIC
-        val loc = if (shareLoc) Graph.loc.last else null
+        // Only precise positions: a rough network one (hundreds of metres off) would move a rescuer on the base map.
+        val loc = if (shareLoc) Graph.loc.usable() else null
         val plain = HeartbeatPayload(
             role = s.role,
             battery = batteryPercent(),

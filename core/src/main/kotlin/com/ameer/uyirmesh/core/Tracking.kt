@@ -93,3 +93,34 @@ object Tracking {
         return Approach(d, trend, earlier, (spanMs / 60_000).toInt(), (stillMs / 60_000).toInt(), cur.at, eta)
     }
 }
+
+/**
+ * Which of two positions from this phone to keep. A precise GPS fix should not be replaced by a rough
+ * network position just because the rough one is newer: an old fix only gets less certain as time passes
+ * (people move up to about [DRIFT_M_PER_S] on foot), so the rough one wins only once it is really better.
+ */
+object FixChoice {
+    /** Within this the position counts as precise (GPS, or good Wi-Fi positioning). */
+    const val PRECISE_M = 100.0
+
+    /** Positions rougher than this are not used for distances, rescuer tracking or "how far away" updates. */
+    const val USABLE_M = 200.0
+
+    const val DRIFT_M_PER_S = 1.5
+
+    /** Accuracy used when a position does not say how exact it is. */
+    private const val UNKNOWN_M = 5_000.0
+
+    /** True if the new position (accuracy in metres, time) should replace the current one. */
+    fun isBetter(newAccM: Double?, newAt: Long, curAccM: Double?, curAt: Long): Boolean {
+        val dt = newAt - curAt
+        if (dt <= -2 * 60_000) return false
+        if (dt >= 30 * 60_000) return true
+        val n = newAccM ?: UNKNOWN_M
+        val c = curAccM ?: UNKNOWN_M
+        return n <= c + DRIFT_M_PER_S * (maxOf(dt, 0L) / 1000.0)
+    }
+
+    fun isPrecise(accM: Double?): Boolean = accM != null && accM <= PRECISE_M
+    fun isUsable(accM: Double?): Boolean = accM != null && accM <= USABLE_M
+}

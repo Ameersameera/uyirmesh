@@ -55,6 +55,10 @@ object Perms {
 
     fun meshReady(ctx: Context) = missing(ctx, mesh()).isEmpty()
     fun hasLocation(ctx: Context) = has(ctx, Manifest.permission.ACCESS_FINE_LOCATION) || has(ctx, Manifest.permission.ACCESS_COARSE_LOCATION)
+
+    /** Only "approximate" location is allowed (Android 12+ choice): Android then moves the position 1-3 km on purpose. */
+    fun approximateOnly(ctx: Context) =
+        !has(ctx, Manifest.permission.ACCESS_FINE_LOCATION) && has(ctx, Manifest.permission.ACCESS_COARSE_LOCATION)
     fun hasMic(ctx: Context) = has(ctx, MIC)
     fun hasCamera(ctx: Context) = has(ctx, CAMERA)
     fun hasNotifications(ctx: Context) = notifications().all { has(ctx, it) }

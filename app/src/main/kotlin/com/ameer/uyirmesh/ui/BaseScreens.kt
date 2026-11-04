@@ -60,6 +60,7 @@ import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.base.Reports
 import com.ameer.uyirmesh.core.AlertKind
 import com.ameer.uyirmesh.core.CryptoException
+import com.ameer.uyirmesh.core.FixChoice
 import com.ameer.uyirmesh.core.Geo
 import com.ameer.uyirmesh.core.LatLon
 import com.ameer.uyirmesh.core.Roles
@@ -612,6 +613,10 @@ fun CaseScreen(nav: Nav, caseId: String) {
                 KeyValue(tr("battery"), if (c.battery >= 0) "${c.battery}%${if (c.lowBattery) " (${tr("last_position")})" else ""}" else "?")
                 KeyValue(tr("trigger"), p.trigger.lowercase())
                 KeyValue(tr("location"), if (c.lat != null && c.lon != null) "%.5f, %.5f ±%dm".format(java.util.Locale.US, c.lat, c.lon, (c.accuracy ?: 0.0).toInt()) else tr("no_gps"))
+                val acc = c.accuracy
+                if (c.lat != null && acc != null && acc > FixChoice.PRECISE_M) {
+                    Text(tr("victim_loc_rough").replace("{a}", accuracyText(acc)), color = Palette.Orange, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                }
                 KeyValue(tr("location_age"), c.locAt?.let { agoText(it) } ?: "-")
                 KeyValue(tr("route"), (listOf(tr("victim")) + c.path.map { it.take(6) } + listOf(tr("base_short"))).joinToString(" → ") + " (${c.hops} ${tr("hops")})")
                 KeyValue(tr("times_sent"), (c.repeats + 1).toString())
@@ -668,9 +673,9 @@ fun CaseScreen(nav: Nav, caseId: String) {
                         if (approaches.isNotEmpty()) Palette.Blue to L.t("rescuer") else null,
                     ),
                 )
-                MapButtons(c.lat, c.lon, "SOS ${c.caseId.take(6)}")
+                MapButtons(c.lat, c.lon, "SOS ${c.caseId.take(6)}", accuracyM = c.accuracy)
             }
-            if (tracking) TrackingSection(c.team, c.lat != null && c.lon != null, approaches, now)
+            if (tracking) TrackingSection(c.team, c.lat != null && c.lon != null, approaches, now, c.accuracy)
             SectionTitle(tr("assign_team"))
             val teams = Graph.base.teams()
             if (teams.isEmpty()) Text(tr("no_teams_yet"), style = MaterialTheme.typography.bodySmall)

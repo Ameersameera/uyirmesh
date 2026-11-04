@@ -32,6 +32,7 @@ import com.ameer.uyirmesh.mesh.MeshService
 import com.ameer.uyirmesh.ui.L
 import com.ameer.uyirmesh.util.CrashLog
 import com.ameer.uyirmesh.util.MapsLink
+import com.ameer.uyirmesh.util.Perms
 import com.ameer.uyirmesh.web.DashboardServer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -83,6 +84,8 @@ internal fun smokePermissions(): Array<String> = buildList {
  * On-device smoke test (runs on an Android emulator in CI). It uses the app like a person would, and plays the
  * other phones of the mesh by handing the app real encrypted and signed packets, exactly as Nearby would:
  *  1. setup and every public screen (English, Tamil, large text, dark theme, find-me tools)
+ *  1b. precise location: rough network positions shown as rough and never replacing a GPS fix, an SOS sent
+ *     with a rough position corrected as soon as a precise one arrives
  *  2. victim: hands-free countdown, SOS form, signed replies from the base and a rescuer, how far away the
  *     rescuer is (signed updates; late and forged ones ignored), forged reply, cancel
  *  3. base: key file import, login, SOS arriving over a relay, AI priority, rescuer IDs, live tracking of the
@@ -207,6 +210,56 @@ class SmokeTest {
     }
 
     /* ======================= 2. victim ======================= */
+
+    @Test
+    fun a1b_preciseLocation() {
+        finishSetup()
+        toPublicHome()
+        Graph.victim.cancel()
+        Graph.loc.resetForTest()
+        val locationOn = Perms.locationOn(act())
+        Log.i(TAG, "emulator location switch: ${if (locationOn) "on" else "off"}")
+        fun fix(accuracyM: Float, metresNorth: Double = 0.0) = android.location.Location("smoke-test").apply {
+            latitude = 11.6643 + metresNorth / 111_195.0
+            longitude = 78.1460
+            accuracy = accuracyM
+            time = now()
+        }
+
+        // A rough network position (1.5 km off) is shown as rough, with a one-tap fix.
+        Graph.loc.offer(fix(1500f, metresNorth = 1200.0))
+        assertNull(Graph.loc.usable())
+        if (locationOn) {
+            waitText(en("loc_rough").replace("{a}", "±1.5 km"))
+            waitText(en("loc_improve"))
+        } else {
+            waitText(en("loc_off"))
+            waitText(en("loc_turn_on"))
+        }
+        // A GPS fix replaces it at once, and a newer rough position does not replace the GPS fix.
+        Graph.loc.offer(fix(8f))
+        assertEquals(8.0, Graph.loc.accuracyM()!!, 0.1)
+        if (locationOn) waitUntil("rough warning gone") { !has(hasText(en("loc_improve"))) }
+        Graph.loc.offer(fix(1500f, metresNorth = 1500.0))
+        assertEquals(8.0, Graph.loc.accuracyM()!!, 0.1)
+        assertNotNull(Graph.loc.usable())
+
+        // An SOS sent with a rough position is corrected as soon as a precise one arrives.
+        Graph.loc.resetForTest()
+        Graph.loc.offer(fix(1500f, metresNorth = 1200.0))
+        val sos = Graph.victim.quickSos(Triggers.SHAKE)
+        assertEquals(1500.0, sos.payload.accuracy!!, 0.1)
+        Graph.loc.offer(fix(6f))
+        // (Called with a time 20 s ahead instead of waiting out the short pause between updates.)
+        Graph.victim.improveLocation(now() + 20_000)
+        waitUntil("precise position sent") { (Graph.victim.active()?.payload?.accuracy ?: 9e9) <= 100.0 }
+        assertTrue(Graph.victim.active()!!.updatesSent >= 1)
+        ui { act().nav.go("sos_status") }
+        waitRoute("sos_status")
+        waitText(if (locationOn) en("loc_good").substringBefore("{a}") else en("loc_off"))
+        Graph.victim.cancel()
+        back()
+    }
 
     @Test
     fun a2_victimSos() {

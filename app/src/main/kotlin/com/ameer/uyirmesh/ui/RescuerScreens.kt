@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ameer.uyirmesh.Graph
+import com.ameer.uyirmesh.core.FixChoice
+import com.ameer.uyirmesh.util.Loc
 import com.ameer.uyirmesh.core.CryptoException
 import com.ameer.uyirmesh.core.Geo
 import com.ameer.uyirmesh.core.LatLon
@@ -167,6 +169,7 @@ private fun RescuerHome(nav: Nav) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 color = if (peers > 0) Palette.Green else Palette.Orange,
             )
+            Column(Modifier.padding(horizontal = 16.dp)) { LocationQualityCard() }
             when (tab) {
                 0 -> TaskList(nav)
                 1 -> SeenList(nav)
@@ -323,8 +326,11 @@ fun TaskScreen(nav: Nav, caseId: String) {
             Column(Modifier.padding(pad)) { EmptyState(Ic.Task, tr("task_missing")) }
             return@Scaffold
         }
-        val me = loc?.let { LatLon(it.latitude, it.longitude) }
+        // Only a precise own position is used for the distance (a rough network one can be kilometres off).
+        val me = loc?.takeIf { FixChoice.isUsable(Loc.accuracyOf(it)) }?.let { LatLon(it.latitude, it.longitude) }
+        val victimRough = t.accuracy != null && t.accuracy > FixChoice.PRECISE_M
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+            LocationQualityCard()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Chip(if (t.source == TaskSource.DIRECT) tr("direct_sos") else "${t.label} ${t.score}", Palette.priority(t.label))
                 Spacer(Modifier.width(8.dp))
@@ -338,7 +344,7 @@ fun TaskScreen(nav: Nav, caseId: String) {
                     val d = Geo.distanceM(me, target)
                     val bearing = Geo.bearingDeg(me, target)
                     InfoCard(color = Palette.Blue.copy(alpha = 0.1f)) {
-                        Text("${Geo.formatDistance(d)} ${Geo.compassName(bearing)} (${bearing.toInt()}°)", fontSize = 26.sp, fontWeight = FontWeight.Black)
+                        Text("${Geo.formatDistance(d)} ${Geo.compassName(bearing)} (${bearing.toInt()}°)" + if (victimRough) " (${tr("dist_rough")})" else "", fontSize = 26.sp, fontWeight = FontWeight.Black)
                         Text("ETA ${Geo.etaMinutes(d, Graph.prefs.now.speedKmh.toDouble())} min @ ${Graph.prefs.now.speedKmh} km/h", style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -346,8 +352,9 @@ fun TaskScreen(nav: Nav, caseId: String) {
                     me?.let { MapMarker("me", it.lat, it.lon, Palette.Blue, L.t("you"), 4) },
                     MapMarker("t", target.lat, target.lon, Palette.priority(t.label), t.label, 0),
                 ))
-                Text("GPS %.5f, %.5f".format(java.util.Locale.US, t.lat, t.lon), style = MaterialTheme.typography.bodySmall)
-                MapButtons(t.lat, t.lon, "SOS: " + t.summary.take(30))
+                Text("GPS %.5f, %.5f".format(java.util.Locale.US, t.lat, t.lon) + (t.accuracy?.let { " " + accuracyText(it) } ?: ""), style = MaterialTheme.typography.bodySmall)
+                if (victimRough) Text(tr("victim_loc_rough").replace("{a}", accuracyText(t.accuracy)), color = Palette.Orange, style = MaterialTheme.typography.bodySmall)
+                MapButtons(t.lat, t.lon, "SOS: " + t.summary.take(30), accuracyM = t.accuracy)
             } else {
                 Text(tr("no_location_yet"), color = Palette.Orange)
             }

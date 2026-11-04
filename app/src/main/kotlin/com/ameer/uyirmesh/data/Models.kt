@@ -476,10 +476,13 @@ data class TaskItem(
     val source: String,
     val at: Long,
     val updatedAt: Long,
+    /** How exact the victim's position is (metres), null if not known. */
+    val accuracy: Double? = null,
 ) {
     fun toJson() = linkedMapOf(
         "c" to caseId, "v" to victim, "la" to lat, "lo" to lon, "lb" to label, "sc" to score, "su" to summary,
         "md" to medical, "p" to people, "tm" to team, "st" to state, "so" to source, "a" to at, "u" to updatedAt,
+        "ac" to accuracy,
     )
 
     companion object {
@@ -488,7 +491,7 @@ data class TaskItem(
         fun from(m: Map<String, Any?>) = TaskItem(
             m.str("c"), m.str("v"), m.doubleOrNull("la"), m.doubleOrNull("lo"), m.str("lb"), m.int("sc"), m.str("su"),
             m.str("md"), m.int("p", 1), m.str("tm"), m.str("st", NEW), m.str("so", TaskSource.BASE), m.long("a"),
-            m.long("u"),
+            m.long("u"), m.doubleOrNull("ac"),
         )
     }
 }
@@ -505,16 +508,18 @@ data class SeenSos(
     val lastAt: Long,
     val hops: Int,
     val cancelled: Boolean,
+    /** How exact [lat]/[lon] is (metres), null if not known. */
+    val accuracy: Double? = null,
 ) {
     fun toJson() = linkedMapOf(
         "c" to caseId, "v" to victim, "p" to payload.toJson(), "la" to lat, "lo" to lon, "b" to battery,
-        "fa" to firstAt, "la_" to lastAt, "h" to hops, "x" to cancelled,
+        "fa" to firstAt, "la_" to lastAt, "h" to hops, "x" to cancelled, "ac" to accuracy,
     )
 
     companion object {
         fun from(m: Map<String, Any?>) = SeenSos(
             m.str("c"), m.str("v"), SosPayload.fromJson(m.obj("p")), m.doubleOrNull("la"), m.doubleOrNull("lo"),
-            m.int("b", -1), m.long("fa"), m.long("la_"), m.int("h", -1), m.bool("x"),
+            m.int("b", -1), m.long("fa"), m.long("la_"), m.int("h", -1), m.bool("x"), m.doubleOrNull("ac"),
         )
     }
 }

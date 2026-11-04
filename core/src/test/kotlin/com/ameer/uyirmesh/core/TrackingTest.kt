@@ -161,6 +161,40 @@ class TrackingTest {
     }
 
     @Test
+    fun aRoughNetworkPositionDoesNotReplaceARecentGpsFix() {
+        val gps = 8.0
+        // A rough cell position (1.5 km) a few minutes after a GPS fix is ignored...
+        assertFalse(FixChoice.isBetter(1500.0, t0 + 3 * 60_000, gps, t0))
+        assertFalse(FixChoice.isBetter(1500.0, t0 + 15 * 60_000, gps, t0))
+        // ...until the GPS fix is so old that it is no longer better (or older than 30 minutes).
+        assertTrue(FixChoice.isBetter(1500.0, t0 + 17 * 60_000, gps, t0))
+        assertTrue(FixChoice.isBetter(3000.0, t0 + 30 * 60_000, gps, t0))
+        // A new GPS fix always replaces an older one, and a GPS fix replaces a rough position at once.
+        assertTrue(FixChoice.isBetter(12.0, t0 + 30_000, gps, t0))
+        assertTrue(FixChoice.isBetter(9.0, t0 + 1_000, 1500.0, t0))
+        // Among rough positions the newer, slightly better one wins; a much older one never does.
+        assertTrue(FixChoice.isBetter(1400.0, t0 + 1_000, 1500.0, t0))
+        assertFalse(FixChoice.isBetter(5.0, t0 - 3 * 60_000, 1500.0, t0))
+        // Out of order by a few seconds (two providers): only if more exact.
+        assertTrue(FixChoice.isBetter(6.0, t0 - 2_000, gps, t0))
+        assertFalse(FixChoice.isBetter(30.0, t0 - 2_000, gps, t0))
+        // A position without accuracy counts as very rough.
+        assertFalse(FixChoice.isBetter(null, t0 + 60_000, gps, t0))
+        assertTrue(FixChoice.isBetter(50.0, t0 + 1_000, null, t0))
+        assertTrue(FixChoice.isPrecise(8.0))
+        assertFalse(FixChoice.isPrecise(1500.0))
+        assertFalse(FixChoice.isUsable(null))
+        assertTrue(FixChoice.isUsable(150.0))
+    }
+
+    @Test
+    fun taskCarriesTheVictimsLocationAccuracy() {
+        val t = TaskPayload("c1", "v1", 11.66, 78.14, "High", 70, "Flood", "", 3, "ALPHA", t0, 1500.0)
+        assertEquals(1500.0, TaskPayload.fromBytes(t.toBytes()).accuracy!!, 0.0)
+        assertNull(TaskPayload.fromBytes(t.copy(accuracy = null).toBytes()).accuracy)
+    }
+
+    @Test
     fun taskStatusCarriesFixTimeAndBattery() {
         val st = TaskStatusPayload("case1", "r-1", "Ravi", "A", TaskState.ON_THE_WAY, 11.66, 78.14, t0, t0 - 5_000, 71)
         val back = TaskStatusPayload.fromBytes(st.toBytes())

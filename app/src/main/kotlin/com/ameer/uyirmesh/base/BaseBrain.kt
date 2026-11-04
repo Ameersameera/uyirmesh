@@ -398,7 +398,7 @@ class BaseBrain(private val ctx: Context) {
         val key = teamKey(c.team, create = false) ?: return
         val t = TaskPayload(
             c.caseId, c.victim, c.lat, c.lon, if (cancelled) "CANCELLED" else c.label, if (cancelled) -1 else c.score,
-            summary(c), c.payload.medical, c.payload.people, c.team, System.currentTimeMillis(),
+            summary(c), c.payload.medical, c.payload.people, c.team, System.currentTimeMillis(), c.accuracy,
         )
         val ttl = maxOf(Graph.mesh.outbox.ttl, 8)
         Graph.mesh.send(Graph.mesh.outbox.teamSignedByBase(keys, PacketType.TASK, t.toBytes(), c.team, key, ttl))

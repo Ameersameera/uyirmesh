@@ -106,6 +106,7 @@ fun PublicHome(nav: Nav) {
     }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             MeshStatusCard(stats.peers, stats.waitingOwn, stats.running) { nav.go("network") }
+            LocationQualityCard()
             if (countdown.active) {
                 InfoCard(color = Palette.Red.copy(alpha = 0.15f)) {
                     Text(tr("countdown_title").replace("{n}", countdown.seconds.toString()), fontWeight = FontWeight.Bold, color = Palette.Red)
@@ -374,6 +375,7 @@ fun SosStatusScreen(nav: Nav) {
                 if (stats.waitingOwn > 0 && s.active) Text(tr("mesh_waiting").replace("{n}", stats.waitingOwn.toString()), color = Palette.Orange, style = MaterialTheme.typography.bodySmall)
             }
             if (s.active && s.helpDistanceM >= 0) HelpComingCard(nav, s)
+            if (s.active) LocationQualityCard(showWhenGood = true)
             SectionTitle(tr("timeline"))
             TimelineStep(tr("tl_sent"), timeText(s.sentAt), true)
             TimelineStep(tr("tl_handed").replace("{n}", s.handedTo.toString()), timeText(s.handedAt), s.handedAt > 0)

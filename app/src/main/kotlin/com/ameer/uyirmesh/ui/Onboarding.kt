@@ -113,6 +113,7 @@ private fun ColumnScope.PermissionStep(finish: () -> Unit) {
     @Suppress("UNUSED_VARIABLE") val r = refresh
     val meshOk = Perms.meshReady(ctx)
     val micOk = Perms.hasMic(ctx)
+    val preciseOk = Perms.hasLocation(ctx) && !Perms.approximateOnly(ctx)
     val notifOk = Perms.hasNotifications(ctx)
     val btOn = Perms.bluetoothOn(ctx)
     val locOn = Perms.locationOn(ctx)
@@ -123,6 +124,7 @@ private fun ColumnScope.PermissionStep(finish: () -> Unit) {
     Text(tr("setup_title"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     Text(tr("setup_body"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp))
     CheckRow(tr("perm_nearby"), tr("perm_nearby_why"), meshOk) { launcher.launch(Perms.missing(ctx, Perms.mesh()).toTypedArray()) }
+    CheckRow(tr("perm_precise"), tr("perm_precise_why"), preciseOk) { launcher.launch(Perms.location().toTypedArray()) }
     CheckRow(tr("perm_mic"), tr("perm_mic_why"), micOk) { launcher.launch(arrayOf(Perms.MIC)) }
     if (Perms.notifications().isNotEmpty()) CheckRow(tr("perm_notif"), tr("perm_notif_why"), notifOk) { launcher.launch(Perms.notifications().toTypedArray()) }
     CheckRow(tr("bluetooth_on"), tr("bluetooth_on_why"), btOn) { Perms.open(ctx, Perms.bluetoothSettings()) }

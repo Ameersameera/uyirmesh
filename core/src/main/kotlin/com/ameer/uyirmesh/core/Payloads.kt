@@ -388,11 +388,13 @@ data class TaskPayload(
     val people: Int,
     val team: String,
     val at: Long = 0,
+    /** How exact the victim's position is (metres), null if not known. */
+    val accuracy: Double? = null,
 ) {
     fun toBytes(): ByteArray = Json.toBytes(
         linkedMapOf(
             "c" to caseId, "vd" to victimDevice, "la" to lat.r6(), "lo" to lon.r6(), "lb" to label, "sc" to score,
-            "su" to summary, "md" to medical, "p" to people, "tm" to team, "t" to at,
+            "su" to summary, "md" to medical, "p" to people, "tm" to team, "t" to at, "ac" to accuracy,
         )
     )
 
@@ -401,7 +403,7 @@ data class TaskPayload(
             val m = Json.objectFromBytes(b)
             return TaskPayload(
                 m.str("c"), m.str("vd"), m.doubleOrNull("la"), m.doubleOrNull("lo"), m.str("lb"), m.int("sc"),
-                m.str("su").take(400), m.str("md").take(300), m.int("p", 1), m.str("tm"), m.long("t"),
+                m.str("su").take(400), m.str("md").take(300), m.int("p", 1), m.str("tm"), m.long("t"), m.doubleOrNull("ac"),
             )
         }
     }

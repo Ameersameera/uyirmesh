@@ -200,7 +200,7 @@ function renderDetail() {
       <div>Name</div><div>${esc(c.name) || "-"}</div><div>Phone</div><div>${esc(c.phone) || "-"}</div>
       <div>Blood</div><div>${esc(c.blood) || "-"}</div><div>Medical</div><div style="color:#d32f2f">${esc(c.medical) || "-"}</div>
       <div>Battery</div><div>${c.battery >= 0 ? c.battery + "%" : "?"}${c.lowBattery ? " (last position)" : ""}</div>
-      <div>Location</div><div>${c.lat != null ? c.lat.toFixed(5) + ", " + c.lon.toFixed(5) + " ±" + Math.round(c.accuracy || 0) + " m · " + gmLink(c.lat, c.lon) : "no GPS yet"}</div>
+      <div>Location</div><div>${c.lat != null ? c.lat.toFixed(5) + ", " + c.lon.toFixed(5) + " ±" + Math.round(c.accuracy || 0) + " m · " + gmLink(c.lat, c.lon) + (c.accuracy > 100 ? ' <span class="badge orange">rough: no precise GPS yet</span>' : "") : "no GPS yet"}</div>
       <div>Sent by</div><div>${esc(c.trigger.toLowerCase())} · ${c.repeats + 1} time(s)</div>
       <div>Packet path</div><div>${esc(path)} (${c.hops} hops)</div>
       ${c.note ? `<div>Note</div><div>"${esc(c.note)}"</div>` : ""}

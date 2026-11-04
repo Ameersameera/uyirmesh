@@ -162,8 +162,10 @@ class Rescuer(private val ctx: Context) {
             return
         }
         Graph.loc.startTracking("rescuer", 30_000)
+        Graph.loc.ensureGps()
         checkAutoLock()
-        val l = Graph.loc.last ?: return
+        // Only precise positions (GPS or good Wi-Fi) are used: a rough network one can be kilometres off.
+        val l = Graph.loc.usable() ?: return
         val last = store.crumbs.value.lastOrNull()
         val now = System.currentTimeMillis()
         if (last == null || Geo.distanceM(last.lat, last.lon, l.latitude, l.longitude) > 15 || now - last.at > 5 * 60_000) {
@@ -181,7 +183,7 @@ class Rescuer(private val ctx: Context) {
     fun sendProgress(now: Long = System.currentTimeMillis()) {
         val b = bundle() ?: return
         if (Graph.prefs.now.role != Roles.RESCUER) return
-        val l = Graph.loc.last ?: return
+        val l = Graph.loc.usable() ?: return
         if (Graph.loc.ageMs() > 2 * 60_000) return
         val interval = if (Graph.prefs.now.batterySaver) 5 * 60_000L else 2 * 60_000L
         val myId = Graph.mesh.engine.myId
@@ -206,11 +208,13 @@ class Rescuer(private val ctx: Context) {
         val now = System.currentTimeMillis()
         val existing = store.seen.value.firstOrNull { it.caseId == s.caseId }
         if (existing != null && existing.victim != p.src) return
-        val lat = if (Geo.isValid(s.lat, s.lon)) s.lat else existing?.lat
-        val lon = if (Geo.isValid(s.lat, s.lon)) s.lon else existing?.lon
+        val hasLoc = Geo.isValid(s.lat, s.lon)
+        val lat = if (hasLoc) s.lat else existing?.lat
+        val lon = if (hasLoc) s.lon else existing?.lon
+        val accuracy = if (hasLoc) s.accuracy else existing?.accuracy
         store.seen.upsert(
             { it.caseId },
-            SeenSos(s.caseId, p.src, s, lat, lon, s.battery, existing?.firstAt ?: now, now, p.hops, false),
+            SeenSos(s.caseId, p.src, s, lat, lon, s.battery, existing?.firstAt ?: now, now, p.hops, false, accuracy),
         )
         if (existing == null) {
             val dist = distanceText(lat, lon)
@@ -220,15 +224,18 @@ class Rescuer(private val ctx: Context) {
     }
 
     fun onUpdate(p: Packet, u: SosUpdate) {
+        val hasLoc = Geo.isValid(u.lat, u.lon)
         store.seen.modify({ it.caseId }, u.caseId) {
             if (it.victim != p.src) it
             else it.copy(
-                lat = if (Geo.isValid(u.lat, u.lon)) u.lat else it.lat, lon = if (Geo.isValid(u.lat, u.lon)) u.lon else it.lon,
+                lat = if (hasLoc) u.lat else it.lat, lon = if (hasLoc) u.lon else it.lon,
+                accuracy = if (hasLoc) u.accuracy else it.accuracy,
                 battery = if (u.battery >= 0) u.battery else it.battery, lastAt = System.currentTimeMillis(),
             )
         }
         store.tasks.modify({ it.caseId }, u.caseId) {
-            if (it.victim != p.src || !Geo.isValid(u.lat, u.lon)) it else it.copy(lat = u.lat, lon = u.lon, updatedAt = System.currentTimeMillis())
+            if (it.victim != p.src || !hasLoc) it
+            else it.copy(lat = u.lat, lon = u.lon, accuracy = u.accuracy, updatedAt = System.currentTimeMillis())
         }
     }
 
@@ -253,7 +260,7 @@ class Rescuer(private val ctx: Context) {
         }
         val item = TaskItem(
             t.caseId, t.victimDevice, t.lat, t.lon, t.label, t.score, t.summary, t.medical, t.people, t.team,
-            existing?.state ?: TaskItem.NEW, TaskSource.BASE, existing?.at ?: now, now,
+            existing?.state ?: TaskItem.NEW, TaskSource.BASE, existing?.at ?: now, now, t.accuracy,
         )
         store.tasks.upsert({ it.caseId }, item)
         if (existing == null) {
@@ -288,7 +295,7 @@ class Rescuer(private val ctx: Context) {
         val existing = store.tasks.value.firstOrNull { it.caseId == s.caseId }
         if (existing == null) {
             store.tasks.add(
-                TaskItem(s.caseId, s.victim, s.lat, s.lon, "SOS", 0, summary, s.payload.medical, s.payload.people, b.cert.team, TaskItem.NEW, TaskSource.DIRECT, now, now),
+                TaskItem(s.caseId, s.victim, s.lat, s.lon, "SOS", 0, summary, s.payload.medical, s.payload.people, b.cert.team, TaskItem.NEW, TaskSource.DIRECT, now, now, s.accuracy),
             )
         }
         setTaskState(s.caseId, TaskState.ACCEPTED)
@@ -298,7 +305,7 @@ class Rescuer(private val ctx: Context) {
         val b = bundle() ?: return
         val now = System.currentTimeMillis()
         val t = store.tasks.modify({ it.caseId }, caseId) { it.copy(state = state, updatedAt = now) } ?: return
-        val loc = Graph.loc.last
+        val loc = Graph.loc.usable()
         val st = TaskStatusPayload(caseId, b.cert.rescuerId, b.cert.name, b.cert.team, state, loc?.latitude, loc?.longitude, now, loc?.time ?: 0L, Graph.mesh.batteryPercent())
         Graph.mesh.send(Graph.mesh.outbox.team(PacketType.TASK_STATUS, st.toBytes(), b.cert.team, b.teamKey))
         // Tell the victim directly too (works even when the base is out of range).
@@ -339,7 +346,7 @@ class Rescuer(private val ctx: Context) {
     }
 
     private fun distanceText(lat: Double?, lon: Double?): String {
-        val me = Graph.loc.last ?: return ""
+        val me = Graph.loc.usable() ?: return ""
         if (!Geo.isValid(lat, lon)) return ""
         val d = Geo.distanceM(me.latitude, me.longitude, lat!!, lon!!)
         val b = Geo.compassName(Geo.bearingDeg(LatLon(me.latitude, me.longitude), LatLon(lat, lon)))

@@ -7,6 +7,8 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.VisibleForTesting
+import com.ameer.uyirmesh.core.FixChoice
 import com.ameer.uyirmesh.core.LatLon
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -19,7 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * GPS position. Satellite GPS works without internet or mobile network; the first fix outdoors
- * can take a minute when there is no network help, so the last good position is always kept.
+ * can take a minute when there is no network help, so the last good position is always kept, and a
+ * rough network position (hundreds of metres to kilometres off) never replaces a recent GPS fix.
  */
 class Loc(private val ctx: Context) {
     private val fused = LocationServices.getFusedLocationProviderClient(ctx)
@@ -31,7 +34,7 @@ class Loc(private val ctx: Context) {
     val last: Location? get() = _last.value
     val lastLatLon: LatLon? get() = last?.let { LatLon(it.latitude, it.longitude) }
 
-    private var trackers = 0
+    private var gpsOn = false
 
     private val fusedCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -43,18 +46,22 @@ class Loc(private val ctx: Context) {
     fun offer(l: Location) {
         if (l.latitude == 0.0 && l.longitude == 0.0) return
         val cur = _last.value
-        if (cur == null || isBetter(l, cur)) _last.value = l
-    }
-
-    private fun isBetter(n: Location, o: Location): Boolean {
-        val newer = n.time - o.time
-        if (newer > 2 * 60_000) return true
-        if (newer < -2 * 60_000) return false
-        return n.accuracy <= o.accuracy || (newer > 0 && n.accuracy < o.accuracy * 1.5f)
+        if (cur == null || FixChoice.isBetter(accuracyOf(l), l.time, accuracyOf(cur), cur.time)) _last.value = l
     }
 
     /** Age of the last position in ms, or Long.MAX_VALUE. */
     fun ageMs(): Long = last?.let { System.currentTimeMillis() - it.time } ?: Long.MAX_VALUE
+
+    /** How exact the last position is, in metres (null if unknown or no position). */
+    fun accuracyM(): Double? = last?.let { accuracyOf(it) }
+
+    /** The last position if it is exact enough to work out distances (GPS or good Wi-Fi), else null. */
+    fun usable(): Location? = last?.takeIf { FixChoice.isUsable(accuracyOf(it)) }
+
+    @VisibleForTesting
+    fun resetForTest() {
+        _last.value = null
+    }
 
     @SuppressLint("MissingPermission")
     fun seed() {
@@ -124,11 +131,32 @@ class Loc(private val ctx: Context) {
         applyTracking()
     }
 
+    /** Asks again for positions, e.g. after "precise location" or the phone's location was turned on. */
+    @Synchronized
+    fun restart() {
+        applyTracking(force = true)
+        seed()
+    }
+
+    /** Starts the satellite GPS listener if the GPS was turned on after tracking started. */
     @SuppressLint("MissingPermission")
-    private fun applyTracking() {
+    @Synchronized
+    fun ensureGps() {
+        if (activeInterval == 0L || gpsOn || !Perms.hasLocation(ctx)) return
+        try {
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, activeInterval, 5f, gpsListener, Looper.getMainLooper())
+                gpsOn = true
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun applyTracking(force: Boolean = false) {
         val want = owners.values.minOrNull() ?: 0L
-        if (want == activeInterval) return
-        if (activeInterval != 0L) {
+        if (want == activeInterval && !force) return
+        if (activeInterval != 0L || force) {
             try {
                 fused.removeLocationUpdates(fusedCallback)
             } catch (_: Exception) {
@@ -137,21 +165,22 @@ class Loc(private val ctx: Context) {
                 lm.removeUpdates(gpsListener)
             } catch (_: Exception) {
             }
+            gpsOn = false
         }
         activeInterval = want
-        if (want == 0L) return
+        if (want == 0L || !Perms.hasLocation(ctx)) return
         try {
             val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, want)
                 .setMinUpdateIntervalMillis(want / 2)
+                .setWaitForAccurateLocation(true)
                 .build()
             fused.requestLocationUpdates(req, fusedCallback, Looper.getMainLooper())
         } catch (_: Exception) {
         }
-        try {
-            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, want, 5f, gpsListener, Looper.getMainLooper())
-            }
-        } catch (_: Exception) {
-        }
+        ensureGps()
+    }
+
+    companion object {
+        fun accuracyOf(l: Location): Double? = if (l.hasAccuracy()) l.accuracy.toDouble() else null
     }
 }
