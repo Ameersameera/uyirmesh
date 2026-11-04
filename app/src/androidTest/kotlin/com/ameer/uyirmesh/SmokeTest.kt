@@ -2,6 +2,7 @@ package com.ameer.uyirmesh
 
 import android.Manifest
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.ameer.uyirmesh.base.Reports
 import com.ameer.uyirmesh.core.*
@@ -133,6 +135,7 @@ class SmokeTest {
         finishSetup()
         assertEquals("home", route())
         assertTrue(Graph.prefs.now.onboarded)
+        shot("01_home")
 
         // Every tile and button on the home screen opens its screen, and Back returns home.
         val tiles = listOf(
@@ -165,6 +168,7 @@ class SmokeTest {
 
         // Find me: siren, flashlight, flashing screen, vibration.
         go("findme")
+        shot("16_find_me")
         tap(en("start_siren"))
         if (eventually(5_000) { Graph.alarm.siren.value }) {
             tap(en("stop_siren"))
@@ -183,6 +187,14 @@ class SmokeTest {
         go("settings")
         tap("தமிழ்")
         waitUntil("Tamil") { Graph.prefs.now.lang == "ta" }
+        if (shots) {
+            go("home")
+            shot("02_home_tamil")
+            back()
+            go("firstaid")
+            shot("17_first_aid_tamil")
+            back()
+        }
         for (r in PUBLIC_ROUTES) visit(r)
         tap("English")
         waitUntil("English") { Graph.prefs.now.lang == "en" }
@@ -232,6 +244,7 @@ class SmokeTest {
         if (locationOn) {
             waitText(en("loc_rough").replace("{a}", "±1.5 km"))
             waitText(en("loc_improve"))
+            shot("18_location_rough")
         } else {
             waitText(en("loc_off"))
             waitText(en("loc_turn_on"))
@@ -309,6 +322,7 @@ class SmokeTest {
         waitUntil("distance from the rescuer") { Graph.victim.active()?.helpDistanceM == 620 }
         waitText(en("help_coming"))
         waitText(en("help_distance").replace("{w}", "Karthik").replace("{d}", "620 m"))
+        shot("03_victim_help_coming")
         // Within 150 m the victim is asked to shout or use the siren and flashlight.
         inject(Outbox(Ids.newDeviceId(), TestBase.pinned).signedByRescuer(karthik, PacketType.PROGRESS, progress.copy(distanceM = 120, etaMin = 2, at = now() + 1_000).toBytes(), me))
         waitUntil("rescuer close") { Graph.victim.active()?.helpDistanceM == 120 }
@@ -346,6 +360,7 @@ class SmokeTest {
         waitRoute("sos_form")
         tap(en("kind_flood"))
         tap(en("need_water"))
+        shot("04_sos_form")
         tap(en("send_sos_now"))
         waitRoute("sos_status")
         val sos = Graph.victim.active()
@@ -382,6 +397,7 @@ class SmokeTest {
         typeInto(hasSetTextAction(), "I am at the temple, safe")
         tapIcon(en("send"))
         waitUntil("chat sent") { Graph.store.chat.value.any { it.mine && it.text == "I am at the temple, safe" } }
+        shot("06_group_chat")
         back()
 
         // I'm safe.
@@ -470,9 +486,15 @@ class SmokeTest {
 
         // The case on screen, with the AI reasons; dispatcher sets "on the way".
         tab(en("cases"))
+        if (shots) {
+            waitText("on the roof")
+            shot("07_base_cases")
+        }
         click(hasText("on the roof", substring = true) and hasClickAction())
         waitRoute("case/${sos.caseId}")
+        shot("08a_case_detail_top")
         waitText(en("why_priority"))
+        shot("08b_case_ai_reasons")
         waitText("Ravi")
         tap(en("cs_on_way"))
         waitUntil("status on the way") { caseOf(sos.caseId)?.status == CaseStatus.ON_THE_WAY }
@@ -486,6 +508,7 @@ class SmokeTest {
         type(en("pin_4_8"), "4321")
         tap(en("create_id"))
         waitText(en("issued_for").replace("{n}", "Karthik").replace("{t}", "ALPHA"), 30_000)
+        shot("13_rescuer_id_qr")
         assertTrue(Graph.store.rescuers.value.any { it.name == "Karthik" && it.team == "ALPHA" })
         back()
 
@@ -521,6 +544,7 @@ class SmokeTest {
         assertEquals(600.0, approach.distanceM, 25.0)
         Log.i(TAG, "tracking: ${approach.trend} ${approach.distanceM.toInt()} m (was ${approach.earlierM?.toInt()} m), ETA ${approach.etaMin} min")
         waitText(en("trend_closer"))
+        shot("09_case_tracking")
         val before = rescuerOf(karthikId)!!
         val forger = Ids.newDeviceId()
         inject(karthikAt(0, 0.0, key = Crypto.random(32), battery = 99))
@@ -538,6 +562,7 @@ class SmokeTest {
 
         tab(en("map"))
         waitText(en("heatmap"))
+        shot("10_base_map")
         tab(en("network"))
         waitText(en("packet_paths"))
         // Phones that sent a heartbeat in the last 15 minutes (the relay, Karthik's phone, the forger, maybe this base).
@@ -545,6 +570,7 @@ class SmokeTest {
             val live = Graph.store.nodes.value.count { now() - it.lastSeen < 15 * 60_000 }
             live >= 1 && has(hasText(en("phones_reporting").replace("{n}", live.toString())))
         }
+        shot("11_base_network")
 
         // Signed alert and a shelter.
         tab(en("more"))
@@ -571,6 +597,7 @@ class SmokeTest {
         tap(en("web_on"))
         waitUntil("dashboard switched on") { Graph.prefs.now.webServer }
         waitForServer()
+        shot("12_base_web_dashboard")
         val page = http("GET", "/")
         assertEquals(200, page.code)
         assertTrue(page.body.contains("UyirMesh"))
@@ -687,6 +714,7 @@ class SmokeTest {
         waitRoute("task/${baseTask.caseId}")
         waitText(en("nav_google_maps"))
         waitText(en("open_map_app"))
+        shot("14_rescuer_task")
         tap(en("accept"))
         waitUntil("task accepted") { taskOf(baseTask.caseId)?.state == TaskState.ACCEPTED }
         tap(en("on_my_way"))
@@ -721,6 +749,7 @@ class SmokeTest {
 
         tab(en("map"))
         waitText(en("breadcrumb"))
+        shot("15_rescuer_map")
 
         // Team chat (encrypted with the team key), both ways.
         tab(en("team"))
@@ -902,6 +931,7 @@ class SmokeTest {
         val start = hasText(en("start")) and hasClickAction()
         val startAnyway = hasText(en("start_anyway")) and hasClickAction()
         waitUntil("permission step") { has(start) || has(startAnyway) }
+        shot("00_onboarding_permissions")
         if (has(start)) tap(en("start")) else tap(en("start_anyway"))
         waitRoute("home")
     }
@@ -961,7 +991,33 @@ class SmokeTest {
         throw AssertionError("Dashboard did not start (service running ${MeshService.running}, urls ${Graph.base.serverUrls.value})", last)
     }
 
+    /**
+     * Saves a screenshot of the phone screen for the project report, only when the test runs with the
+     * instrumentation argument shots=1 (the "App screenshots" workflow). It runs `screencap` as the shell user, so
+     * the files survive the app being uninstalled after the test. It never fails the test.
+     */
+    private fun shot(name: String) {
+        if (!shots) return
+        try {
+            rule.waitForIdle()
+            Thread.sleep(600)
+            shell("mkdir -p $SHOT_DIR")
+            shell("screencap -p $SHOT_DIR/$name.png")
+            Log.i(TAG, "screenshot $name")
+        } catch (e: Throwable) {
+            Log.w(TAG, "screenshot $name failed", e)
+        }
+    }
+
+    private fun shell(command: String) {
+        val pfd = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+    }
+
+    private val shots: Boolean by lazy { InstrumentationRegistry.getArguments().getString("shots") == "1" }
+
     companion object {
+        private const val SHOT_DIR = "/data/local/tmp/uyir_shots"
         private val PUBLIC_ROUTES = listOf(
             "alerts", "chat", "missing", "shelters", "map", "firstaid", "report", "volunteer", "profile", "network",
             "selftest", "modes", "safe", "findme", "about", "log", "sos_form", "sos_status",

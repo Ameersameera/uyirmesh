@@ -12,8 +12,22 @@ adb shell settings put global transition_animation_scale 0 || true
 adb shell settings put global animator_duration_scale 0 || true
 adb logcat -c || true
 
-gradle :app:connectedDebugAndroidTest --stacktrace
+# SHOTS=1 (the "App screenshots" workflow) also saves a screenshot of each main screen into ./shots.
+extra=()
+if [ "${SHOTS:-0}" = "1" ]; then
+  adb shell rm -rf /data/local/tmp/uyir_shots || true
+  extra+=("-Pandroid.testInstrumentationRunnerArguments.shots=1")
+fi
+
+gradle :app:connectedDebugAndroidTest --stacktrace ${extra[@]+"${extra[@]}"}
 status=$?
+
+if [ "${SHOTS:-0}" = "1" ]; then
+  mkdir -p shots
+  adb pull /data/local/tmp/uyir_shots/. shots/ || true
+  echo "================ screenshots ================"
+  ls -la shots || true
+fi
 
 adb logcat -d -v time > logcat.txt || true
 echo "================ app notes from the smoke test ================"
