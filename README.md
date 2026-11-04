@@ -46,7 +46,7 @@ Download the latest APK: **Releases → v1.0 → UyirMesh.apk** (Android 8.0 or 
 
 Random Forest (30 trees, depth 8, 17 features) trained with scikit-learn on 20,000 synthetic SOS messages
 labelled by a weighted triage policy, exported to JSON and evaluated on the phone. Each prediction is
-explained with tree-path contributions ("Injured +22", "Flood water rising +14"). Waiting time and repeated
+explained with tree-path contributions ("Injured +19", "1 child +4"). Waiting time and repeated
 messages raise the score. Test accuracy 80.1 %, 99.8 % within one class — see `ml/model_report.md`.
 
 ## Live tracking and maps (`core/Tracking.kt`)
@@ -76,6 +76,17 @@ on-device smoke test on an Android 14 emulator → the release is published only
 
 Local build: Android Studio (JDK 17), run `scripts/fetch_voice_model.sh` once for the voice SOS model.
 The pure-Kotlin core can be tested without Android: `localtest/run_core_tests.sh`.
+
+The "App screenshots" workflow runs the same smoke test on a larger emulator screen and saves a screenshot of
+each main screen to the `screenshots` branch.
+
+## Mesh simulation
+
+`localtest/run_mesh_sim.sh` runs the measurements used in the project report with the real `MeshEngine`,
+packet format and cryptography and many virtual phones (links within 60 m, at most 6 per phone):
+a line of phones (TTL limit), random deployments of 20-100 phones in 400 m x 400 m, lossy links with retries,
+and store-and-forward with walking phones in 1 km x 1 km. Radio links are idealised, so the results show how
+the mesh logic behaves, not real radio ranges.
 
 ## Limits (by design of Android)
 
