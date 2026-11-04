@@ -21,6 +21,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -397,6 +399,7 @@ class SmokeTest {
         typeInto(hasSetTextAction(), "I am at the temple, safe")
         tapIcon(en("send"))
         waitUntil("chat sent") { Graph.store.chat.value.any { it.mine && it.text == "I am at the temple, safe" } }
+        if (shots) hideKeyboard()
         shot("06_group_chat")
         back()
 
@@ -438,6 +441,8 @@ class SmokeTest {
         type(en("base_password"), TestBase.PASSWORD)
         tap(en("log_in"))
         waitFor(tabNode(en("cases")), 30_000)
+        // Screenshots only: the base phone stands about 1.5 km from the victim (the emulator is elsewhere).
+        if (shots) Graph.loc.offer(here(11.6750, 78.1550))
 
         // An SOS arrives over one relay phone, encrypted for the base.
         val victim = Ids.newDeviceId()
@@ -709,6 +714,8 @@ class SmokeTest {
         tab(en("nearby_sos"))
         tap(en("take_this"))
         waitUntil("direct task accepted") { taskOf(sos.caseId)?.state == TaskState.ACCEPTED }
+        // Screenshots only: the rescuer stands about 1.3 km south of the task.
+        if (shots) Graph.loc.offer(here(11.6683, 78.1600))
         tab(en("tasks"))
         click(hasText("Fire · 3 people", substring = true) and hasClickAction())
         waitRoute("task/${baseTask.caseId}")
@@ -1007,6 +1014,18 @@ class SmokeTest {
         } catch (e: Throwable) {
             Log.w(TAG, "screenshot $name failed", e)
         }
+    }
+
+    private fun here(lat: Double, lon: Double) = android.location.Location("smoke-test").apply {
+        latitude = lat
+        longitude = lon
+        accuracy = 5f
+        time = now()
+    }
+
+    private fun hideKeyboard() = ui {
+        val a = act()
+        WindowCompat.getInsetsController(a.window, a.window.decorView).hide(WindowInsetsCompat.Type.ime())
     }
 
     private fun shell(command: String) {

@@ -16,6 +16,10 @@ adb logcat -c || true
 extra=()
 if [ "${SHOTS:-0}" = "1" ]; then
   adb shell rm -rf /data/local/tmp/uyir_shots || true
+  # Screenshots only: no notification banners over the screens, and the emulator GPS placed in Salem
+  # (near the test cases) instead of the emulator's default location.
+  adb shell settings put global heads_up_notifications_enabled 0 || true
+  adb emu geo fix 78.1550 11.6750 || true
   extra+=("-Pandroid.testInstrumentationRunnerArguments.shots=1")
 fi
 
