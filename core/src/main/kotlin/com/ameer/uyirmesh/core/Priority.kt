@@ -184,7 +184,7 @@ object Triage {
             reasons.add(Reason(label, featurePoints[idx].roundToInt()))
         }
         add(5, "${input.people} ${if (input.people == 1) "person" else "people"}")
-        if (input.children > 0) add(6, "${input.children} children")
+        if (input.children > 0) add(6, "${input.children} ${if (input.children == 1) "child" else "children"}")
         if (input.elderly > 0) add(7, "${input.elderly} elderly")
         if (input.disabled > 0) add(8, "${input.disabled} disabled")
         if (input.pregnant > 0) add(9, "${input.pregnant} pregnant")

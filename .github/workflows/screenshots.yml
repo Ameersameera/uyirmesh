@@ -1,7 +1,8 @@
 name: App screenshots
 
 # Runs the same on-device smoke test on a larger emulator screen (Nexus 4 profile, 768 x 1280) and keeps a
-# screenshot of each main screen as the "app-screenshots" artifact, for the project report and the README.
+# screenshot of each main screen, for the project report and the README. The screenshots are kept as the
+# "app-screenshots" artifact and on the "screenshots" branch (replaced on every run).
 # It does not build or publish the release (that is "Build APK").
 on:
   workflow_dispatch: {}
@@ -13,7 +14,7 @@ on:
       - 'scripts/ci_smoke.sh'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: screenshots
@@ -80,3 +81,16 @@ jobs:
           name: app-screenshots
           path: shots/
           if-no-files-found: warn
+
+      - name: Save screenshots to the screenshots branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! ls shots/*.png >/dev/null 2>&1; then echo "no screenshots"; exit 0; fi
+          cd shots
+          git init -q -b screenshots
+          git add *.png
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "App screenshots from run ${GITHUB_RUN_ID}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" screenshots
