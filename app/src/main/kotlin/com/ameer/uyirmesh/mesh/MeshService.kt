@@ -33,6 +33,7 @@ class MeshService : LifecycleService() {
     private var voice: VoiceTrigger? = null
     private var shake: ShakeDetector? = null
     private var fall: FallDetector? = null
+    private var sensors: SensorScanner? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentTypes = -1
     private var foregroundStart = false
@@ -169,6 +170,14 @@ class MeshService : LifecycleService() {
             fall?.stop()
             fall = null
         }
+        // Bluetooth sensor nodes (water level, rain, gas) heard nearby are passed into the mesh.
+        if (s.sensorScan) {
+            if (sensors == null) sensors = SensorScanner(this)
+            sensors?.start()
+        } else {
+            sensors?.stop()
+            sensors = null
+        }
         // Keep the CPU awake for shake and fall detection with the screen off (voice listening keeps it awake by itself).
         setWakeLock(wantShake || wantFall || s.role == Roles.BASE)
         Graph.base.webServerCheck()
@@ -231,6 +240,8 @@ class MeshService : LifecycleService() {
         shake = null
         fall?.stop()
         fall = null
+        sensors?.stop()
+        sensors = null
         setWakeLock(false)
         Graph.base.stopWebServer()
         Graph.mesh.stop()

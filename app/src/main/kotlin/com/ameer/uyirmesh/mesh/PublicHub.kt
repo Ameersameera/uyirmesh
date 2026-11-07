@@ -4,6 +4,9 @@ import android.content.Context
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.AlertKind
 import com.ameer.uyirmesh.core.AlertPayload
+import com.ameer.uyirmesh.core.BloodGroups
+import com.ameer.uyirmesh.core.Names
+import com.ameer.uyirmesh.core.Skills
 import com.ameer.uyirmesh.core.ChatPayload
 import com.ameer.uyirmesh.core.Destinations
 import com.ameer.uyirmesh.core.FindRequest
@@ -87,6 +90,22 @@ class PublicHub(private val ctx: Context) {
         Graph.log("VOLUNTEER", "Offered help: ${skills.joinToString()}")
     }
 
+    /** "I can donate": goes to the base only (sealed), with the donor's name, phone and blood group. */
+    fun offerBlood(a: AlertItem): Boolean {
+        val profile = store.profile.value
+        if (profile.blood.isBlank()) return false
+        sendVolunteer(listOf(Skills.BLOOD_DONOR), "Blood ${profile.blood} for: ${a.title}".take(300))
+        Graph.prefs.putLong("blood_offer_${a.id}", System.currentTimeMillis())
+        Graph.log("VOLUNTEER", "Offered blood (${profile.blood}) for ${a.title}")
+        return true
+    }
+
+    fun offeredBlood(alertId: String): Boolean = Graph.prefs.getLong("blood_offer_$alertId") > 0
+
+    /** Missing-person notices that probably mean this person (similar name), not yet marked found. */
+    fun missingMatches(name: String): List<MissingItem> =
+        store.missing.value.filter { !it.found && Names.similar(it.person, name) }
+
     fun sendFind(query: String) {
         val q = query.trim().take(60)
         if (q.isEmpty()) return
@@ -118,13 +137,22 @@ class PublicHub(private val ctx: Context) {
         val existing = store.alerts.value.firstOrNull { it.id == a.alertId }
         val item = AlertItem(
             a.alertId, a.kind, a.severity, a.title, a.message, a.lat, a.lon, a.radiusM, a.capacity, a.occupancy,
-            a.validUntil, a.at, now, p.isDrill, false,
+            a.validUntil, a.at, now, p.isDrill, false, a.blood,
         )
         store.alerts.upsert({ it.id }, item)
         // Shelter occupancy updates arrive often; only new alerts make noise.
         if (existing != null && a.kind == AlertKind.SHELTER) return
         if (existing != null && existing.at == a.at) return
         val drill = if (p.isDrill) "[${L.t("drill")}] " else ""
+        if (a.kind == AlertKind.BLOOD) {
+            // Only donors whose group can help are asked directly; everyone else just sees it in the list.
+            val profile = store.profile.value
+            if (profile.donor && BloodGroups.canDonate(profile.blood, a.blood)) {
+                Notifier.alert(ctx, a.alertId, drill + L.t("blood_you_can_help").replace("{g}", a.blood.ifBlank { "?" }), a.title + " · " + a.message, critical = false)
+            }
+            Graph.log("ALERT", "Blood request from base: ${a.blood} ${a.title}")
+            return
+        }
         val critical = a.severity >= 3 || a.kind == AlertKind.EVACUATE
         Notifier.alert(ctx, a.alertId, drill + alertTitle(a.kind) + ": " + a.title, a.message, critical)
         Graph.log("ALERT", "Signed alert from base: ${a.kind} ${a.title}")
@@ -137,6 +165,14 @@ class PublicHub(private val ctx: Context) {
     fun onSafe(p: Packet, s: SafePayload) {
         if (store.safe.value.any { it.id == p.idHex }) return
         store.safe.add(SafeItem(p.idHex, p.src, s.name, s.message, s.lat, s.lon, s.place, s.at, false))
+        // Someone this phone reported missing may have just said "I'm safe": tell the family at once.
+        for (m in missingMatches(s.name).filter { it.mine }) {
+            Notifier.message(
+                ctx, Notifier.ID_MSG + 2, L.t("missing_match_title").replace("{n}", m.person),
+                L.t("missing_match_body").replace("{n}", s.name).replace("{m}", s.message.take(80)), "missing",
+            )
+            Graph.log("MISSING", "Possible match for ${m.person}: ${s.name} said they are safe")
+        }
     }
 
     fun onReport(p: Packet, r: ReportPayload) {

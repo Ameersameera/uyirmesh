@@ -340,7 +340,9 @@ object Skills {
     const val DRIVER = "DRIVER"
     const val ELECTRICIAN = "ELECTRICIAN"
     const val COOK = "COOK"
-    val ALL = listOf(DOCTOR, NURSE, SWIMMER, BOAT, DRIVER, ELECTRICIAN, COOK)
+    /** Willing to give blood when the base asks for this person's blood group. */
+    const val BLOOD_DONOR = "BLOOD_DONOR"
+    val ALL = listOf(DOCTOR, NURSE, SWIMMER, BOAT, DRIVER, ELECTRICIAN, COOK, BLOOD_DONOR)
 }
 
 data class VolunteerPayload(

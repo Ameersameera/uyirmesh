@@ -136,19 +136,22 @@ data class AlertItem(
     val receivedAt: Long,
     val drill: Boolean,
     val mine: Boolean,
+    /** Blood group asked for in a BLOOD alert. */
+    val blood: String = "",
 ) {
     fun isValid(now: Long) = validUntil == 0L || validUntil > now
 
     fun toJson() = linkedMapOf(
         "i" to id, "k" to kind, "sv" to severity, "ti" to title, "m" to message, "la" to lat, "lo" to lon,
         "r" to radiusM, "cp" to capacity, "oc" to occupancy, "vu" to validUntil, "a" to at, "ra" to receivedAt,
-        "d" to drill, "mi" to mine,
+        "d" to drill, "mi" to mine, "bg" to blood,
     )
 
     companion object {
         fun from(m: Map<String, Any?>) = AlertItem(
             m.str("i"), m.str("k"), m.int("sv", 1), m.str("ti"), m.str("m"), m.doubleOrNull("la"), m.doubleOrNull("lo"),
             m.int("r"), m.int("cp"), m.int("oc"), m.long("vu"), m.long("a"), m.long("ra"), m.bool("d"), m.bool("mi"),
+            m.str("bg"),
         )
     }
 }
@@ -570,6 +573,8 @@ data class Profile(
     val medicines: String = "",
     val contactName: String = "",
     val contactPhone: String = "",
+    /** Agreed to be asked when the base needs this blood group. */
+    val donor: Boolean = false,
 ) {
     fun medicalSummary(): String = buildList {
         if (blood.isNotBlank()) add("Blood $blood")
@@ -580,12 +585,12 @@ data class Profile(
 
     fun toJson() = linkedMapOf(
         "n" to name, "ph" to phone, "bg" to blood, "al" to allergies, "co" to conditions, "me" to medicines,
-        "cn" to contactName, "cp" to contactPhone,
+        "cn" to contactName, "cp" to contactPhone, "dn" to donor,
     )
 
     companion object {
         fun from(m: Map<String, Any?>) = Profile(
-            m.str("n"), m.str("ph"), m.str("bg"), m.str("al"), m.str("co"), m.str("me"), m.str("cn"), m.str("cp"),
+            m.str("n"), m.str("ph"), m.str("bg"), m.str("al"), m.str("co"), m.str("me"), m.str("cn"), m.str("cp"), m.bool("dn"),
         )
     }
 }

@@ -731,6 +731,7 @@ private fun ScanResult(nav: Nav, purpose: String, text: String, again: () -> Uni
                 }
             }
         }
+        text.startsWith("UMC1:") -> ChildFoundForm(nav, text)
         text.startsWith("UMS1:") -> {
             val parts = text.split(':')
             val id = parts.getOrNull(1).orEmpty()

@@ -427,6 +427,62 @@ class SmokeTest {
         tap(en("tell_everyone_safe"))
         waitUntil("I'm safe sent") { Graph.store.safe.value.any { it.mine } }
         back()
+
+        // Version 2 community features.
+        // Blood donor finder: a donor whose group can give sees "I can donate"; the offer goes to the base only.
+        Graph.store.setProfile(Graph.store.profile.value.copy(blood = "O-", donor = true))
+        val bloodAlert = AlertPayload(Ids.newId(), AlertKind.BLOOD, 2, "Blood needed: A+", "Govt hospital, ward 3", validUntil = now() + 3_600_000, at = now(), blood = "A+")
+        inject(baseOut.signedByBase(TestBase.keys, PacketType.ALERT, bloodAlert.toBytes(), Destinations.ALL))
+        waitUntil("blood alert stored") { Graph.store.alerts.value.any { it.id == bloodAlert.alertId && it.blood == "A+" } }
+        go("alerts")
+        tap(en("blood_i_can_donate"))
+        waitUntil("blood offered") { Graph.public.offeredBlood(bloodAlert.alertId) }
+        waitText(en("blood_offered"))
+        shot("06c_blood_request")
+        back()
+
+        // Missing person: a similar name saying "I'm safe" shows as a possible match.
+        Graph.public.sendMissing("Lakshmi", 62, "green saree", "near the bus stand", "9840012345")
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).plain(PacketType.SAFE, SafePayload("Lakshmy", "I am at the school shelter", null, null, "", now()).toBytes(), Destinations.ALL))
+        waitUntil("possible match noticed") { Graph.store.log.value.any { it.text.contains("Possible match for Lakshmi") } }
+        go("missing")
+        waitText(en("possible_match"))
+        back()
+
+        // Lost-child QR: the finder's encrypted message reaches the parent's phone.
+        val child = Graph.safety.registerChild("Meena")
+        val tag = ChildTag.fromQr(child.qr)
+        val finder = Ids.newDeviceId()
+        val found = ChildFound(tag.tagId, "Shop owner", "9800000000", "at the temple gate", 11.6643, 78.1460, now())
+        val foundId = Packet.newId()
+        val foundBox = Crypto.keyEncrypt(tag.key, found.toBytes(), Packet.aadFor(PacketType.CHILD_FOUND, foundId, finder))
+        inject(Packet.create(PacketType.CHILD_FOUND, finder, Graph.prefs.now.deviceId, foundBox, 6, now(), PacketFlags.ENC_TEAM, foundId))
+        waitUntil("child found") { (Graph.store.children.value.firstOrNull { it.tagId == tag.tagId }?.foundAt ?: 0L) > 0L }
+        Graph.alarm.stopAll()
+        go("children")
+        waitText("Shop owner")
+        shot("06d_child_found")
+        back()
+        assertTrue(Graph.safety.sendChildFound(tag, "test note"))
+
+        // Checklist and practice game.
+        go("checklist")
+        tap(en("prep_water"))
+        waitUntil("checklist ticked") { Graph.store.checklist.value.any { it.key == "water" && it.done } }
+        back()
+        go("practice")
+        tap(en("pg_q1_b"))
+        waitText(en("practice_right"))
+        back()
+
+        // A Bluetooth sensor reading passed into the mesh shows on the sensors screen.
+        val adv = byteArrayOf('U'.code.toByte(), 'M'.code.toByte(), 1, 1, 0, 132.toByte(), 1, 77, 0x0A, 0x0B, 0x0C, 0x0D)
+        Graph.safety.relaySensor(SensorPayload.fromAdvert(adv, now())!!)
+        waitUntil("sensor stored") { Graph.store.sensors.value.any { it.sensorId == "0A0B0C0D" && it.alarm } }
+        Graph.alarm.stopAll()
+        go("sensors")
+        waitText("132 cm")
+        back()
     }
 
     /* ======================= 3. rescue base ======================= */
@@ -658,6 +714,10 @@ class SmokeTest {
         assertEquals('P'.code.toByte(), zip[0])
         assertEquals('K'.code.toByte(), zip[1])
         assertFalse(String(zip, Charsets.ISO_8859_1).contains("Ravi"))
+
+        // A blood request from the base carries the blood group.
+        assertTrue(Graph.base.sendAlert(AlertKind.BLOOD, 2, "Blood needed: O+", "Govt hospital", null, null, 0, 60, blood = "O+"))
+        assertTrue(Graph.store.alerts.value.any { it.mine && it.kind == AlertKind.BLOOD && it.blood == "O+" })
 
         // The base beacon is signed with the base key and goes to every phone.
         assertTrue(Graph.baseOps.sendBeacon())

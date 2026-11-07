@@ -682,13 +682,13 @@ class BaseBrain(private val ctx: Context) {
 
     /* ---------------- alerts and shelters ---------------- */
 
-    fun sendAlert(kind: String, severity: Int, title: String, message: String, lat: Double?, lon: Double?, radiusM: Int, validMinutes: Int, capacity: Int = 0, occupancy: Int = 0, alertId: String = Ids.newId()): Boolean {
+    fun sendAlert(kind: String, severity: Int, title: String, message: String, lat: Double?, lon: Double?, radiusM: Int, validMinutes: Int, capacity: Int = 0, occupancy: Int = 0, alertId: String = Ids.newId(), blood: String = ""): Boolean {
         val keys = keys() ?: return false
         val now = System.currentTimeMillis()
-        val a = AlertPayload(alertId, kind, severity.coerceIn(1, 3), title.take(80), message.take(500), lat, lon, radiusM, capacity, occupancy, if (validMinutes > 0) now + validMinutes * 60_000L else 0, now)
+        val a = AlertPayload(alertId, kind, severity.coerceIn(1, 3), title.take(80), message.take(500), lat, lon, radiusM, capacity, occupancy, if (validMinutes > 0) now + validMinutes * 60_000L else 0, now, blood.take(8))
         val p = Graph.mesh.outbox.signedByBase(keys, PacketType.ALERT, a.toBytes(), Destinations.ALL, maxOf(Graph.mesh.outbox.ttl, 8))
         Graph.mesh.send(p)
-        store.alerts.upsert({ it.id }, com.ameer.uyirmesh.data.AlertItem(a.alertId, kind, a.severity, a.title, a.message, lat, lon, radiusM, capacity, occupancy, a.validUntil, now, now, p.isDrill, true))
+        store.alerts.upsert({ it.id }, com.ameer.uyirmesh.data.AlertItem(a.alertId, kind, a.severity, a.title, a.message, lat, lon, radiusM, capacity, occupancy, a.validUntil, now, now, p.isDrill, true, a.blood))
         Graph.log("BASE", "Signed alert sent: $kind $title")
         return true
     }

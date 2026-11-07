@@ -21,4 +21,5 @@ java ${JAVA_OPTS:-} -cp "$CP" Runner \
   com.ameer.uyirmesh.core.TrackingTest \
   com.ameer.uyirmesh.core.VoiceFormTest \
   com.ameer.uyirmesh.core.Version2Test \
-  com.ameer.uyirmesh.core.Version2bTest 2>&1 | grep -v "^Picked up"
+  com.ameer.uyirmesh.core.Version2bTest \
+  com.ameer.uyirmesh.core.CommunityTest 2>&1 | grep -v "^Picked up"

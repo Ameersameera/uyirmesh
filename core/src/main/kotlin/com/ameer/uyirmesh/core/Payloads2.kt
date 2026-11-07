@@ -217,11 +217,12 @@ data class SensorPayload(
         }
 
         /**
-         * Reads the BLE advertisement of a UyirMesh sensor: manufacturer data
-         * "UM" | version(1) | kind(1: 1 water, 2 rain, 3 gas) | value(int16, cm or %) | alarm(1) | battery(1) | id(4).
+         * Reads the BLE advertisement of a UyirMesh sensor: the manufacturer data after the company id (0xFFFF),
+         * "UM" | version(1) | kind(1: 1 water, 2 rain, 3 gas) | value(int16, big-endian, cm or %) | alarm(1) |
+         * battery(1) | id(4) = 12 bytes.
          */
         fun fromAdvert(data: ByteArray, now: Long): SensorPayload? {
-            if (data.size < 13 || data[0] != 'U'.code.toByte() || data[1] != 'M'.code.toByte() || data[2].toInt() != 1) return null
+            if (data.size < 12 || data[0] != 'U'.code.toByte() || data[1] != 'M'.code.toByte() || data[2].toInt() != 1) return null
             val kind = when (data[3].toInt()) {
                 1 -> SensorKind.WATER_LEVEL
                 2 -> SensorKind.RAIN

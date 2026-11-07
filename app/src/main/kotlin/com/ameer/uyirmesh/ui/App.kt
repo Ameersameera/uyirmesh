@@ -113,6 +113,10 @@ private fun Route(nav: Nav, role: String) {
         "base_polls" -> BasePollsScreen(nav)
         "base_ids" -> BaseRescuerIdsScreen(nav)
         "relay" -> RelayModeScreen(nav)
+        "checklist" -> ChecklistScreen(nav)
+        "practice" -> PracticeScreen(nav)
+        "children" -> ChildrenScreen(nav)
+        "sensors" -> SensorsScreen(nav)
         else -> PublicHome(nav)
     }
 }

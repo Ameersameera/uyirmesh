@@ -168,6 +168,10 @@ fun PublicHome(nav: Nav) {
             SectionTitle(tr("safety_tools"))
             MenuTile(Ic.Touch, tr("picture_sos"), tr("picture_sos_sub"), Palette.Red) { nav.go("picture_sos") }
             MenuTile(Ic.Timer, tr("checkin"), tr("checkin_sub"), Palette.Teal) { nav.go("checkin") }
+            MenuTile(Ic.Child, tr("child_tag_title"), tr("child_tag_sub"), Palette.Purple) { nav.go("children") }
+            MenuTile(Ic.Checklist, tr("checklist_title"), tr("checklist_sub"), Palette.Green) { nav.go("checklist") }
+            MenuTile(Ic.Game, tr("practice_title"), tr("practice_sub"), Palette.Blue) { nav.go("practice") }
+            MenuTile(Ic.Sensor, tr("sensors_title"), tr("sensors_sub"), Palette.Teal) { nav.go("sensors") }
             SectionTitle(tr("help_and_info"))
             MenuTile(Ic.Alert, tr("alerts"), tr("alerts_sub"), Palette.Orange, badge = liveAlerts.size) { nav.go("alerts") }
             MenuTile(Ic.Chat, tr("group_chat"), tr("group_chat_sub"), Palette.Blue) { nav.go("chat") }
@@ -758,6 +762,7 @@ fun AlertsScreen(nav: Nav) {
                     }
                     Text(a.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 6.dp))
                     Text(a.message)
+                    if (a.kind == "BLOOD" && a.isValid(now)) BloodAlertActions(a, nav)
                     if (a.lat != null && a.lon != null) {
                         val where = if (me != null) {
                             val d = Geo.distanceM(me, LatLon(a.lat, a.lon))
@@ -827,6 +832,7 @@ fun SafeScreen(nav: Nav) {
 @Composable
 fun MissingScreen(nav: Nav) {
     val missing by Graph.store.missing.flow.collectAsStateWithLifecycle()
+    val safeList by Graph.store.safe.flow.collectAsStateWithLifecycle()
     val finds by Graph.store.finds.flow.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
     var person by remember { mutableStateOf("") }
@@ -884,6 +890,7 @@ fun MissingScreen(nav: Nav) {
                     if (m.description.isNotBlank()) Text(m.description)
                     if (m.lastSeen.isNotBlank()) Text("${tr("last_seen")}: ${m.lastSeen}", style = MaterialTheme.typography.bodySmall)
                     Text("${tr("contact")}: ${m.reporter} ${m.contact} · ${timeText(m.at)}", style = MaterialTheme.typography.bodySmall)
+                    MissingMatches(m, safeList)
                     if (!m.found) TonalButton(tr("mark_found"), Ic.Check) { Graph.public.markFound(m) }
                 }
             }
@@ -982,6 +989,7 @@ fun skillLabel(s: String): String = when (s) {
     Skills.BOAT -> tr("sk_boat")
     Skills.DRIVER -> tr("sk_driver")
     Skills.ELECTRICIAN -> tr("sk_electrician")
+    Skills.BLOOD_DONOR -> tr("sk_blood")
     else -> tr("sk_cook")
 }
 
@@ -998,6 +1006,7 @@ fun ProfileScreen(nav: Nav) {
     var medicines by remember { mutableStateOf(p.medicines) }
     var contactName by remember { mutableStateOf(p.contactName) }
     var contactPhone by remember { mutableStateOf(p.contactPhone) }
+    var donor by remember { mutableStateOf(p.donor) }
     var family by remember { mutableStateOf(Graph.prefs.now.familyPhones) }
     var showQr by remember { mutableStateOf(false) }
     Scaffold(topBar = { ScreenBar(tr("medical_card"), { nav.back() }) }) { pad ->
@@ -1006,6 +1015,7 @@ fun ProfileScreen(nav: Nav) {
             Field(tr("your_name"), name, { name = it.take(40) })
             Field(tr("phone"), phone, { phone = it.take(15) }, number = true)
             Field(tr("blood_group"), blood, { blood = it.uppercase().take(4) })
+            SwitchRow(tr("blood_donor_optin"), tr("blood_donor_optin_sub"), donor) { donor = it }
             Field(tr("allergies"), allergies, { allergies = it.take(100) })
             Field(tr("conditions"), conditions, { conditions = it.take(100) })
             Field(tr("medicines"), medicines, { medicines = it.take(100) })
@@ -1015,7 +1025,7 @@ fun ProfileScreen(nav: Nav) {
             Text(tr("family_phones_sub"), style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(12.dp))
             PrimaryButton(tr("save")) {
-                val np = p.copy(name = name.trim(), phone = phone.trim(), blood = blood.trim(), allergies = allergies.trim(), conditions = conditions.trim(), medicines = medicines.trim(), contactName = contactName.trim(), contactPhone = contactPhone.trim())
+                val np = p.copy(name = name.trim(), phone = phone.trim(), blood = blood.trim(), allergies = allergies.trim(), conditions = conditions.trim(), medicines = medicines.trim(), contactName = contactName.trim(), contactPhone = contactPhone.trim(), donor = donor)
                 Graph.store.setProfile(np)
                 Graph.prefs.update { it.copy(name = name.trim(), phone = phone.trim(), familyPhones = family.trim()) }
                 showQr = true

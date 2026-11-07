@@ -84,7 +84,7 @@ class Version2Test {
     @Test
     fun sensorAdvertAndChildTag() {
         // "UM", version 1, water level, 132 cm, alarm on, battery 77, id DEADBEEF
-        val adv = byteArrayOf('U'.code.toByte(), 'M'.code.toByte(), 1, 1, 0, 132.toByte(), 1, 77, 0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte(), 0)
+        val adv = byteArrayOf('U'.code.toByte(), 'M'.code.toByte(), 1, 1, 0, 132.toByte(), 1, 77, 0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())
         val s = SensorPayload.fromAdvert(adv, t0)
         assertNotNull(s)
         assertEquals(SensorKind.WATER_LEVEL, s!!.kind)
@@ -92,6 +92,10 @@ class Version2Test {
         assertTrue(s.alarm)
         assertEquals("DEADBEEF", s.sensorId)
         assertNull(SensorPayload.fromAdvert(byteArrayOf(1, 2, 3), t0))
+        assertNull("one byte short", SensorPayload.fromAdvert(adv.copyOf(11), t0))
+        // A negative water level (water below the sensor's zero mark) is read too.
+        val neg = adv.copyOf().also { it[3] = 1; it[4] = 0xFF.toByte(); it[5] = 0xF6.toByte() }
+        assertEquals(-10.0, SensorPayload.fromAdvert(neg, t0)!!.value, 0.0)
         assertEquals(132.0, SensorPayload.fromBytes(s.toBytes()).value, 0.0)
 
         val tag = ChildTag.create("Meena", Ids.newDeviceId())

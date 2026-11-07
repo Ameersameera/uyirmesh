@@ -511,6 +511,7 @@ private fun MoreTab(nav: Nav) {
         MenuTile(Ic.Hazard, tr("mark_hazard"), tr("mark_hazard_sub"), Palette.Red) { nav.go("hazard") }
         MenuTile(Ic.Block, tr("rescuer_ids"), tr("rescuer_ids_sub"), Palette.Grey) { nav.go("base_ids") }
         MenuTile(Ic.Shelter, tr("shelters_supplies"), tr("shelters_supplies_sub"), Palette.Teal) { nav.go("base_shelters") }
+        MenuTile(Ic.Sensor, tr("sensors_title"), tr("sensors_sub"), Palette.Teal) { nav.go("sensors") }
         MenuTile(Ic.Computer, tr("web_dashboard"), tr("web_dashboard_sub"), Palette.Blue) { nav.go("web") }
         MenuTile(Ic.Doc, tr("export_csv"), tr("export_csv_sub"), Palette.Green) {
             val f = Reports.writeCsv(ctx)
@@ -537,7 +538,7 @@ private fun MoreTab(nav: Nav) {
         for (v in volunteers.sortedByDescending { it.at }) {
             InfoCard {
                 Text("${v.name} · ${v.phone}", fontWeight = FontWeight.Bold)
-                Text(v.skills.joinToString { it.lowercase() } + if (v.note.isNotBlank()) " · ${v.note}" else "", style = MaterialTheme.typography.bodySmall)
+                Text(v.skills.joinToString { it.lowercase().replace('_', ' ') } + if (v.note.isNotBlank()) " · ${v.note}" else "", style = MaterialTheme.typography.bodySmall)
                 Text(distanceFromMe(v.lat, v.lon).removePrefix(" · ") + " · ${timeText(v.at)}", style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -807,13 +808,27 @@ fun BaseAlertScreen(nav: Nav) {
     var validHours by remember { mutableIntStateOf(6) }
     var useLocation by remember { mutableStateOf(true) }
     var sent by remember { mutableStateOf(false) }
+    var blood by remember { mutableStateOf("O+") }
     val alerts by Graph.store.alerts.flow.collectAsStateWithLifecycle()
+    val bloodTitle = tr("blood_needed")
     Scaffold(topBar = { ScreenBar(tr("send_alert"), { nav.back() }) }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).imePadding()) {
             Text(tr("alert_body"), style = MaterialTheme.typography.bodySmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (k in listOf(AlertKind.EVACUATE, AlertKind.DANGER, AlertKind.OFFICIAL, AlertKind.INFO, AlertKind.MISSING, AlertKind.ALL_CLEAR)) {
-                    FilterChip(selected = kind == k, onClick = { kind = k; severity = if (k == AlertKind.EVACUATE || k == AlertKind.DANGER) 3 else 1 }, label = { Text(PublicHub.alertTitle(k)) })
+                for (k in listOf(AlertKind.EVACUATE, AlertKind.DANGER, AlertKind.OFFICIAL, AlertKind.INFO, AlertKind.MISSING, AlertKind.BLOOD, AlertKind.ALL_CLEAR)) {
+                    FilterChip(selected = kind == k, onClick = {
+                        kind = k
+                        severity = if (k == AlertKind.EVACUATE || k == AlertKind.DANGER) 3 else if (k == AlertKind.BLOOD) 2 else 1
+                        if (k == AlertKind.BLOOD && title.isBlank()) title = bloodTitle.replace("{g}", blood)
+                    }, label = { Text(PublicHub.alertTitle(k)) })
+                }
+            }
+            if (kind == AlertKind.BLOOD) {
+                Text(tr("blood_base_hint"), style = MaterialTheme.typography.bodySmall)
+                BloodGroupChips(blood) { g ->
+                    val oldTitle = bloodTitle.replace("{g}", blood)
+                    blood = g
+                    if (title.isBlank() || title == oldTitle) title = bloodTitle.replace("{g}", if (g == com.ameer.uyirmesh.core.BloodGroups.ANY) "?" else g)
                 }
             }
             Field(tr("alert_title"), title, { title = it.take(80) })
@@ -825,7 +840,7 @@ fun BaseAlertScreen(nav: Nav) {
             Spacer(Modifier.height(8.dp))
             PrimaryButton(if (sent) tr("sent_send_another") else tr("sign_and_send"), Ic.Alert, color = Palette.Orange, enabled = title.isNotBlank()) {
                 val loc = if (useLocation) Graph.loc.last else null
-                sent = Graph.base.sendAlert(kind, severity, title.trim(), message.trim(), loc?.latitude, loc?.longitude, if (loc != null) radius else 0, validHours * 60)
+                sent = Graph.base.sendAlert(kind, severity, title.trim(), message.trim(), loc?.latitude, loc?.longitude, if (loc != null) radius else 0, validHours * 60, blood = if (kind == AlertKind.BLOOD) blood else "")
             }
             SectionTitle(tr("sent_alerts"))
             for (a in alerts.filter { it.mine && it.kind != AlertKind.SHELTER }.sortedByDescending { it.at }) {

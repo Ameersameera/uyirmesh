@@ -43,6 +43,8 @@ data class Settings(
     val autoPowerSave: Boolean = true,
     /** Delete old messages and closed cases after this many days (0 = keep). */
     val autoDeleteDays: Int = 0,
+    /** Listen for Bluetooth sensor nodes (water level, rain, gas) and pass their readings on. */
+    val sensorScan: Boolean = false,
 )
 
 class Prefs(context: Context) {
@@ -84,6 +86,7 @@ class Prefs(context: Context) {
             relayMode = sp.getBoolean("relayMode", false),
             autoPowerSave = sp.getBoolean("autoPowerSave", true),
             autoDeleteDays = sp.getInt("autoDeleteDays", 0).coerceIn(0, 365),
+            sensorScan = sp.getBoolean("sensorScan", false),
         )
     }
 
@@ -117,6 +120,7 @@ class Prefs(context: Context) {
             .putBoolean("relayMode", s.relayMode)
             .putBoolean("autoPowerSave", s.autoPowerSave)
             .putInt("autoDeleteDays", s.autoDeleteDays.coerceIn(0, 365))
+            .putBoolean("sensorScan", s.sensorScan)
             .apply()
         _settings.value = s
     }
