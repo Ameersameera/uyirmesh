@@ -538,6 +538,7 @@ fun SettingsScreen(nav: Nav) {
             Stepper(tr("ttl_hops"), s.ttl, 1, 10, Ic.Network) { v -> Graph.prefs.update { it.copy(ttl = v) } }
             Text(tr("ttl_sub"), style = MaterialTheme.typography.bodySmall)
             SwitchRow(tr("drill_mode"), tr("drill_mode_sub"), s.drill) { v -> Graph.prefs.update { it.copy(drill = v) } }
+            RelaySettings()
             SectionTitle(tr("diagnostics"))
             MenuTile(Ic.History, tr("event_log"), tr("event_log_sub")) { nav.go("log") }
             MenuTile(Ic.Security, tr("self_test"), tr("self_test_sub")) { nav.go("selftest") }

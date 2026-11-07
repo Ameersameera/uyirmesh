@@ -1,5 +1,9 @@
 package com.ameer.uyirmesh.rescuer
 
+import com.ameer.uyirmesh.core.HazardPayload
+import com.ameer.uyirmesh.core.Ids
+import com.ameer.uyirmesh.core.Destinations
+
 import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import com.ameer.uyirmesh.Graph
@@ -301,12 +305,12 @@ class Rescuer(private val ctx: Context) {
         setTaskState(s.caseId, TaskState.ACCEPTED)
     }
 
-    fun setTaskState(caseId: String, state: String) {
+    fun setTaskState(caseId: String, state: String, outcome: String = "") {
         val b = bundle() ?: return
         val now = System.currentTimeMillis()
         val t = store.tasks.modify({ it.caseId }, caseId) { it.copy(state = state, updatedAt = now) } ?: return
         val loc = Graph.loc.usable()
-        val st = TaskStatusPayload(caseId, b.cert.rescuerId, b.cert.name, b.cert.team, state, loc?.latitude, loc?.longitude, now, loc?.time ?: 0L, Graph.mesh.batteryPercent())
+        val st = TaskStatusPayload(caseId, b.cert.rescuerId, b.cert.name, b.cert.team, state, loc?.latitude, loc?.longitude, now, loc?.time ?: 0L, Graph.mesh.batteryPercent(), outcome.take(200))
         Graph.mesh.send(Graph.mesh.outbox.team(PacketType.TASK_STATUS, st.toBytes(), b.cert.team, b.teamKey))
         // Tell the victim directly too (works even when the base is out of range).
         val ackStatus = when (state) {
@@ -325,6 +329,22 @@ class Rescuer(private val ctx: Context) {
             if (dist >= 0) synchronized(this) { progressSent[caseId] = now to dist }
         }
         Graph.log("RESCUER", "Task ${caseId.take(6)}: ${state.lowercase().replace('_', ' ')}")
+    }
+
+    /**
+     * Marks a danger here ("bridge broken", "live wire in water") for everyone: signed with this rescuer's key, so
+     * every phone can check it really comes from a rescuer issued by the base.
+     */
+    fun sendHazard(kind: String, note: String, radiusM: Int, cleared: Boolean = false, hazardId: String = Ids.newId()): Boolean {
+        val b = bundle() ?: return false
+        val loc = Graph.loc.usable() ?: Graph.loc.last ?: return false
+        val now = System.currentTimeMillis()
+        val h = HazardPayload(hazardId, kind, note.take(200), loc.latitude, loc.longitude, radiusM.coerceIn(10, 5_000), b.cert.name, b.cert.toBase64(), cleared, now)
+        val p = Graph.mesh.outbox.signedByRescuer(b, PacketType.HAZARD, h.toBytes(), Destinations.ALL, maxOf(Graph.mesh.outbox.ttl, 8))
+        Graph.mesh.send(p)
+        Graph.safety.onHazard(p, h, b.cert.name)
+        Graph.log("RESCUER", "Hazard marked: $kind")
+        return true
     }
 
     fun sendTeamChat(text: String) {

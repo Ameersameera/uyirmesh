@@ -118,6 +118,8 @@ fun PublicHome(nav: Nav) {
                     }
                 }
             }
+            val polls by Graph.store.polls.flow.collectAsStateWithLifecycle()
+            for (p in polls.filter { !it.mine && it.isValid(now) && it.answered < 0 }.takeLast(2)) PollCard(nav, p)
             for (a in liveAlerts.takeLast(2).reversed()) {
                 InfoCard(color = (if (a.severity >= 3) Palette.Red else Palette.Orange).copy(alpha = 0.15f), onClick = { nav.go("alerts") }) {
                     Text("${PublicHub.alertTitle(a.kind)}: ${a.title}", fontWeight = FontWeight.Bold)

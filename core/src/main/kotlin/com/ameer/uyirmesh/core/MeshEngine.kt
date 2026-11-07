@@ -241,6 +241,10 @@ class MeshEngine(
     @Synchronized
     fun bufferSize(): Int = buffer.size
 
+    /** Packets in the store-and-forward buffer that match [predicate] (for the internet gateway). */
+    @Synchronized
+    fun buffered(predicate: (Packet) -> Boolean): List<Packet> = buffer.values.map { it.packet }.filter(predicate)
+
     @Synchronized
     fun hasPending(): Boolean = buffer.values.any { e ->
         e.packet.ttl > 0 && neighbours.any { it != e.from && it != e.packet.src && it !in e.sentTo }
@@ -295,7 +299,8 @@ class MeshEngine(
     private fun isRateLimited(p: Packet, now: Long): Boolean {
         // Replies, alerts and tasks are signed by the base (checked by the validator before this point).
         if (p.type == PacketType.ACK || p.type == PacketType.ALERT || p.type == PacketType.TASK ||
-            p.type == PacketType.FIND_RESULT
+            p.type == PacketType.FIND_RESULT || p.type == PacketType.POLL || p.type == PacketType.BASE_SYNC ||
+            p.type == PacketType.REVOKE
         ) return false
         val q = rate.getOrPut(p.src) { ArrayDeque() }
         while (q.isNotEmpty() && now - q.first() > 60_000) q.removeFirst()

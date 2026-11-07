@@ -34,6 +34,9 @@ data class Settings(
     val speakUpdates: Boolean = true,
     /** Home screen with only big pictures (children, elderly, people who cannot read). */
     val simpleMode: Boolean = false,
+    /** Internet relay: upload/download mesh packets whenever this phone has internet. */
+    val gateway: Boolean = false,
+    val gatewayUrl: String = "",
 )
 
 class Prefs(context: Context) {
@@ -70,6 +73,8 @@ class Prefs(context: Context) {
             fallDetect = sp.getBoolean("fallDetect", false),
             speakUpdates = sp.getBoolean("speakUpdates", true),
             simpleMode = sp.getBoolean("simpleMode", false),
+            gateway = sp.getBoolean("gateway", false),
+            gatewayUrl = sp.getString("gatewayUrl", "") ?: "",
         )
     }
 
@@ -98,6 +103,8 @@ class Prefs(context: Context) {
             .putBoolean("fallDetect", s.fallDetect)
             .putBoolean("speakUpdates", s.speakUpdates)
             .putBoolean("simpleMode", s.simpleMode)
+            .putBoolean("gateway", s.gateway)
+            .putString("gatewayUrl", s.gatewayUrl.take(120))
             .apply()
         _settings.value = s
     }

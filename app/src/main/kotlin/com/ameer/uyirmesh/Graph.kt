@@ -4,6 +4,10 @@ import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import androidx.annotation.VisibleForTesting
 import com.ameer.uyirmesh.base.BaseBrain
+import com.ameer.uyirmesh.base.BaseOps
+import com.ameer.uyirmesh.core.Revocations
+import com.ameer.uyirmesh.mesh.Gateway
+import com.ameer.uyirmesh.mesh.SafetyHub
 import com.ameer.uyirmesh.core.PinnedBaseKeys
 import com.ameer.uyirmesh.data.LogEntry
 import com.ameer.uyirmesh.data.Prefs
@@ -55,6 +59,12 @@ object Graph {
         private set
     lateinit var alarm: Alarm
         private set
+    lateinit var safety: SafetyHub
+        private set
+    lateinit var baseOps: BaseOps
+        private set
+    lateinit var gateway: Gateway
+        private set
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
 
@@ -71,11 +81,15 @@ object Graph {
         vault = Vault(app)
         store = Store(vault, scope)
         store.load()
+        Revocations.addAll(store.revoked.value.map { it.rescuerId })
         pinned = PinnedBaseKeys.fromJson(app.assets.open("base_keys.json").use { String(it.readBytes(), Charsets.UTF_8) })
         loc = Loc(app)
         alarm = Alarm(app)
         victim = Victim(app)
         public = PublicHub(app)
+        safety = SafetyHub(app)
+        baseOps = BaseOps(app)
+        gateway = Gateway(app)
         base = BaseBrain(app)
         rescuer = Rescuer(app)
         router = Router()

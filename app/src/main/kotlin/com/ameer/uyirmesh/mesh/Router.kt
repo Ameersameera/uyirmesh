@@ -26,6 +26,13 @@ import com.ameer.uyirmesh.core.TaskPayload
 import com.ameer.uyirmesh.core.TaskStatusPayload
 import com.ameer.uyirmesh.core.TeamChatPayload
 import com.ameer.uyirmesh.core.VolunteerPayload
+import com.ameer.uyirmesh.core.CaseSync
+import com.ameer.uyirmesh.core.HazardPayload
+import com.ameer.uyirmesh.core.PollAnswer
+import com.ameer.uyirmesh.core.PollPayload
+import com.ameer.uyirmesh.core.RevokePayload
+import com.ameer.uyirmesh.core.SensorPayload
+import com.ameer.uyirmesh.rescuer.TeamVoice
 
 /** Hands every packet addressed to this phone to the part of the app that uses it. */
 class Router {
@@ -137,6 +144,49 @@ class Router {
                     }
                 }
             }
+
+            PacketType.TEAM_VOICE -> {
+                if (!Destinations.isTeam(p.dst)) return
+                val team = Destinations.teamName(p.dst)
+                teamKey(team)?.let { key ->
+                    open { Opener.team(key, p) }?.let { plain ->
+                        val clip = SosMedia.fromBytes(plain)
+                        TeamVoice.onClip(p, team, clip, toBase = isBase, toRescuer = rescuer.bundle() != null)
+                    }
+                }
+            }
+
+            PacketType.HAZARD -> {
+                val signer = if (Authenticity.isBaseSigned(Graph.pinned, p)) {
+                    "BASE"
+                } else {
+                    Authenticity.rescuerSigner(Graph.pinned, p, System.currentTimeMillis())?.name ?: return
+                }
+                Graph.safety.onHazard(p, HazardPayload.fromBytes(p.payload), signer)
+            }
+
+            PacketType.POLL -> {
+                if (!Authenticity.isBaseSigned(Graph.pinned, p)) return
+                Graph.safety.onPoll(p, PollPayload.fromBytes(p.payload))
+            }
+
+            PacketType.POLL_ANSWER -> if (isBase) base.keys()?.let { keys ->
+                open { Opener.asBase(keys, Graph.pinned, p) }?.let { Graph.baseOps.onPollAnswer(p.src, PollAnswer.fromBytes(it)) }
+            }
+
+            PacketType.BASE_SYNC -> {
+                if (!isBase || p.src == myId || !Authenticity.isBaseSigned(Graph.pinned, p)) return
+                Graph.baseOps.onCaseSync(p, CaseSync.fromBytes(p.payload))
+            }
+
+            PacketType.REVOKE -> {
+                if (!Authenticity.isBaseSigned(Graph.pinned, p)) return
+                Graph.safety.onRevoke(RevokePayload.fromBytes(p.payload))
+            }
+
+            PacketType.SENSOR -> Graph.safety.onSensor(p, SensorPayload.fromBytes(p.payload))
+
+            PacketType.CHILD_FOUND -> if (p.dst == myId) Graph.safety.onChildFound(p)
         }
     }
 

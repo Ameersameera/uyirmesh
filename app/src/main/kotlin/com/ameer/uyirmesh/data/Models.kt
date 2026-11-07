@@ -314,6 +314,12 @@ data class CaseItem(
     val duplicateOf: String,
     val drill: Boolean,
     val events: List<CaseEvent>,
+    /** Another rescue base that is already handling this case (multi-base sync), empty if none. */
+    val handledBy: String = "",
+    /** Warning signs found by the base (possible fake or test SOS), shown to the dispatcher. */
+    val flags: List<String> = emptyList(),
+    /** What the rescue team reported when it closed the case ("3 rescued, 1 injured, taken to ..."). */
+    val outcome: String = "",
 ) {
     val isOpen: Boolean get() = status in CaseStatus.OPEN
 
@@ -325,6 +331,7 @@ data class CaseItem(
         "rs" to reasons.map { linkedMapOf("l" to it.label, "p" to it.points) }, "pr" to proba,
         "st" to status, "tm" to team, "rn" to rescuerName, "e" to etaMin, "aa" to assignedAt, "ow" to onWayAt,
         "ra" to rescuedAt, "ca" to cancelledAt, "du" to duplicateOf, "dr" to drill, "ev" to events.map { it.toJson() },
+        "hb" to handledBy, "fl" to flags, "oc" to outcome,
     )
 
     companion object {
@@ -337,6 +344,7 @@ data class CaseItem(
             m.list("pr").mapNotNull { (it as? Number)?.toDouble() }, m.str("st", CaseStatus.NEW), m.str("tm"),
             m.str("rn"), m.int("e", -1), m.long("aa"), m.long("ow"), m.long("ra"), m.long("ca"), m.str("du"),
             m.bool("dr"), m.objs("ev").map { CaseEvent.from(it) },
+            handledBy = m.str("hb"), flags = m.strList("fl"), outcome = m.str("oc"),
         )
     }
 }
@@ -524,11 +532,21 @@ data class SeenSos(
     }
 }
 
-data class TeamMsg(val id: String, val src: String, val name: String, val text: String, val at: Long, val mine: Boolean) {
-    fun toJson() = linkedMapOf("i" to id, "s" to src, "n" to name, "x" to text, "a" to at, "m" to mine)
+data class TeamMsg(
+    val id: String,
+    val src: String,
+    val name: String,
+    val text: String,
+    val at: Long,
+    val mine: Boolean,
+    /** Push-to-talk clip saved in the encrypted store ("ptt_<id>.amr"), empty for text messages. */
+    val audio: String = "",
+    val durationMs: Long = 0,
+) {
+    fun toJson() = linkedMapOf("i" to id, "s" to src, "n" to name, "x" to text, "a" to at, "m" to mine, "au" to audio, "du" to durationMs)
 
     companion object {
-        fun from(m: Map<String, Any?>) = TeamMsg(m.str("i"), m.str("s"), m.str("n"), m.str("x"), m.long("a"), m.bool("m"))
+        fun from(m: Map<String, Any?>) = TeamMsg(m.str("i"), m.str("s"), m.str("n"), m.str("x"), m.long("a"), m.bool("m"), m.str("au"), m.long("du"))
     }
 }
 

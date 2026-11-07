@@ -356,6 +356,7 @@ class BaseBrain(private val ctx: Context) {
         store.cases.upsert({ it.caseId }, updated)
         sendTask(updated)
         replyTo(updated, AckStatus.ASSIGNED, clean, eta, "", -1, emptyList())
+        Graph.baseOps.syncCase(updated)
         Graph.log("BASE", "Case ${caseId.take(6)} assigned to $clean")
     }
 
@@ -370,6 +371,7 @@ class BaseBrain(private val ctx: Context) {
             events = c.events + CaseEvent(now, "STATUS", "Marked ${status.lowercase()} at the base"),
         )
         store.cases.upsert({ it.caseId }, updated)
+        Graph.baseOps.syncCase(updated)
         when (status) {
             CaseStatus.RESCUED -> replyTo(updated, AckStatus.RESCUED, c.team, -1, "", -1, emptyList())
             CaseStatus.ON_THE_WAY -> replyTo(updated, AckStatus.ON_THE_WAY, c.team, c.etaMin, "", -1, emptyList())
@@ -381,7 +383,8 @@ class BaseBrain(private val ctx: Context) {
     fun autoAssign() {
         val teams = teams()
         if (teams.isEmpty()) return
-        val waiting = store.cases.value.filter { it.status == CaseStatus.NEW }.sortedByDescending { it.score }
+        // Cases another base is already handling (multi-base sync) are left to that base.
+        val waiting = store.cases.value.filter { it.status == CaseStatus.NEW && it.handledBy.isBlank() }.sortedByDescending { it.score }
         for (c in waiting) {
             val dupTeam = store.cases.value.firstOrNull { it.caseId == c.duplicateOf && it.team.isNotBlank() }?.team
             val choice = dupTeam ?: teams.filter { activeTasks(it) < MAX_ACTIVE_PER_TEAM }.minByOrNull { t ->
@@ -451,9 +454,11 @@ class BaseBrain(private val ctx: Context) {
             assignedAt = if (c.assignedAt == 0L) now else c.assignedAt,
             onWayAt = if (status == CaseStatus.ON_THE_WAY && c.onWayAt == 0L) now else c.onWayAt,
             rescuedAt = if (status == CaseStatus.RESCUED) now else c.rescuedAt,
-            events = c.events + CaseEvent(now, "TEAM", "${st.rescuerName} (${st.team}): ${st.status.lowercase().replace('_', ' ')}"),
+            outcome = st.outcome.ifBlank { c.outcome },
+            events = c.events + CaseEvent(now, "TEAM", "${st.rescuerName} (${st.team}): ${st.status.lowercase().replace('_', ' ')}${if (st.outcome.isNotBlank()) " · ${st.outcome}" else ""}"),
         )
         store.cases.upsert({ it.caseId }, updated)
+        Graph.baseOps.syncCase(updated)
         if (ack.isNotEmpty()) replyTo(updated, ack, updated.team, eta, if (st.rescuerName.isNotBlank()) "Rescuer: ${st.rescuerName}" else "", -1, emptyList())
         if (status == CaseStatus.UNABLE) {
             Notifier.rescue(ctx, c.caseId + "u", L.t("team_unable"), summary(updated), "base", task = false)
@@ -649,6 +654,7 @@ class BaseBrain(private val ctx: Context) {
             store.cases.edit { list -> list.map { c -> changed[c.caseId]?.let { n -> c.copy(score = n.score, label = n.label, modelScore = n.modelScore, reasons = n.reasons, proba = n.proba) } ?: c } }
         }
         if (Graph.prefs.now.autoAssign) autoAssign()
+        Graph.baseOps.periodic(now)
         // Keep the base's own GPS position fresh for ETAs.
         if (Graph.loc.ageMs() > 5 * 60_000) Graph.loc.requestOnce(30_000) { }
     }

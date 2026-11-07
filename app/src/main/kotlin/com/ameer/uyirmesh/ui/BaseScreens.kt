@@ -503,6 +503,9 @@ private fun MoreTab(nav: Nav) {
     var query by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         MenuTile(Ic.Alert, tr("send_alert"), tr("send_alert_sub"), Palette.Orange) { nav.go("base_alert") }
+        MenuTile(Ic.HowToReg, tr("polls_rollcall"), tr("polls_rollcall_sub"), Palette.Purple) { nav.go("base_polls") }
+        MenuTile(Ic.Hazard, tr("mark_hazard"), tr("mark_hazard_sub"), Palette.Red) { nav.go("hazard") }
+        MenuTile(Ic.Block, tr("rescuer_ids"), tr("rescuer_ids_sub"), Palette.Grey) { nav.go("base_ids") }
         MenuTile(Ic.Shelter, tr("shelters_supplies"), tr("shelters_supplies_sub"), Palette.Teal) { nav.go("base_shelters") }
         MenuTile(Ic.Computer, tr("web_dashboard"), tr("web_dashboard_sub"), Palette.Blue) { nav.go("web") }
         MenuTile(Ic.Doc, tr("export_csv"), tr("export_csv_sub"), Palette.Green) {
@@ -570,6 +573,8 @@ fun CaseScreen(nav: Nav, caseId: String) {
     val c = cases.firstOrNull { it.caseId == caseId }
     var message by remember { mutableStateOf("") }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var handOver by remember { mutableStateOf(false) }
+    if (handOver) HandOverDialog(caseId) { handOver = false }
     DisposableEffect(Unit) { onDispose { player?.release() } }
     Scaffold(topBar = { ScreenBar(tr("case") + " " + caseId.take(6), { nav.back() }) }) { pad ->
         if (c == null) {
@@ -588,6 +593,18 @@ fun CaseScreen(nav: Nav, caseId: String) {
                 }
             }
             Text(Graph.base.summary(c), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp))
+            if (c.handledBy.isNotBlank()) {
+                InfoCard(color = Palette.Purple.copy(alpha = 0.12f)) { Text(tr("handled_by_base").replace("{b}", c.handledBy), fontWeight = FontWeight.SemiBold) }
+            }
+            if (c.outcome.isNotBlank()) {
+                InfoCard(color = Palette.Green.copy(alpha = 0.12f)) { Text(tr("rescue_outcome") + ": " + c.outcome, fontWeight = FontWeight.SemiBold) }
+            }
+            if (c.flags.isNotEmpty()) {
+                InfoCard(color = Palette.Orange.copy(alpha = 0.14f)) {
+                    Text(tr("check_this_sos"), fontWeight = FontWeight.Bold, color = Palette.Orange)
+                    for (f in c.flags) Text("• " + flagText(f), style = MaterialTheme.typography.bodySmall)
+                }
+            }
             SectionTitle(tr("why_priority"))
             InfoCard {
                 Text(tr("ai_model_note").replace("{m}", c.modelScore.toString()), style = MaterialTheme.typography.bodySmall)
@@ -695,6 +712,7 @@ fun CaseScreen(nav: Nav, caseId: String) {
                 for (st in listOf(CaseStatus.ON_THE_WAY, CaseStatus.RESCUED, CaseStatus.NEW)) {
                     TonalButton(caseStatusLabel(st), enabled = c.status != st) { Graph.base.setStatus(c.caseId, st) }
                 }
+                TonalButton(tr("hand_over"), Ic.Swap) { handOver = true }
             }
             SectionTitle(tr("message_victim"))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -789,7 +807,7 @@ fun BaseAlertScreen(nav: Nav) {
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).imePadding()) {
             Text(tr("alert_body"), style = MaterialTheme.typography.bodySmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (k in listOf(AlertKind.EVACUATE, AlertKind.DANGER, AlertKind.INFO, AlertKind.MISSING, AlertKind.ALL_CLEAR)) {
+                for (k in listOf(AlertKind.EVACUATE, AlertKind.DANGER, AlertKind.OFFICIAL, AlertKind.INFO, AlertKind.MISSING, AlertKind.ALL_CLEAR)) {
                     FilterChip(selected = kind == k, onClick = { kind = k; severity = if (k == AlertKind.EVACUATE || k == AlertKind.DANGER) 3 else 1 }, label = { Text(PublicHub.alertTitle(k)) })
                 }
             }

@@ -108,6 +108,10 @@ private fun Route(nav: Nav, role: String) {
         "checkin" -> CheckInScreen(nav)
         "cpr" -> CprScreen(nav)
         "go_shelter" -> GoShelterScreen(nav, nav.arg())
+        "poll" -> PollScreen(nav, nav.arg())
+        "hazard" -> HazardScreen(nav)
+        "base_polls" -> BasePollsScreen(nav)
+        "base_ids" -> BaseRescuerIdsScreen(nav)
         else -> PublicHome(nav)
     }
 }

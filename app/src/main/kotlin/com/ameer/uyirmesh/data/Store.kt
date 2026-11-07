@@ -97,12 +97,20 @@ class Store(private val vault: Vault, private val scope: CoroutineScope) {
     val teamChat = Col("teamchat.json", 400, TeamMsg::toJson, TeamMsg::from)
     val crumbs = Col("crumbs.json", 2000, Crumb::toJson, Crumb::from)
 
+    // version 2
+    val polls = Col("polls.json", 60, PollItem::toJson, PollItem::from)
+    val pollAnswers = Col("pollanswers.json", 3000, PollResponse::toJson, PollResponse::from)
+    val revoked = Col("revoked.json", 500, RevokedItem::toJson, RevokedItem::from)
+    val sensors = Col("sensors.json", 200, SensorItem::toJson, SensorItem::from)
+    val children = Col("children.json", 20, ChildItem::toJson, ChildItem::from)
+    val checklist = Col("checklist.json", 60, ChecklistItem::toJson, ChecklistItem::from)
+
     private val _profile = MutableStateFlow(Profile())
     val profile: StateFlow<Profile> = _profile
 
     private val all: List<Col<*>> = listOf(
         log, mySos, chat, alerts, safe, reports, missing, finds, cases, rescuers, nodes, shelters, checkins, volunteers,
-        tasks, seen, teamChat, crumbs,
+        tasks, seen, teamChat, crumbs, polls, pollAnswers, revoked, sensors, children, checklist,
     )
     private val dirty = ConcurrentHashMap.newKeySet<String>()
 

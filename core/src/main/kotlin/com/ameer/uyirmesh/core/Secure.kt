@@ -74,8 +74,9 @@ object Opener {
 /** Checks that messages which only the base (or a verified rescuer) may send are genuine. */
 object Authenticity {
     fun check(pinned: PinnedBaseKeys, p: Packet, now: Long): Boolean = when (p.type) {
-        PacketType.ALERT, PacketType.TASK, PacketType.FIND_RESULT -> isBaseSigned(pinned, p)
-        PacketType.ACK -> isBaseSigned(pinned, p) || rescuerSigner(pinned, p, now) != null
+        PacketType.ALERT, PacketType.TASK, PacketType.FIND_RESULT, PacketType.POLL, PacketType.BASE_SYNC,
+        PacketType.REVOKE -> isBaseSigned(pinned, p)
+        PacketType.ACK, PacketType.HAZARD -> isBaseSigned(pinned, p) || rescuerSigner(pinned, p, now) != null
         PacketType.PROGRESS -> rescuerSigner(pinned, p, now) != null
         else -> true
     }
@@ -83,21 +84,29 @@ object Authenticity {
     fun isBaseSigned(pinned: PinnedBaseKeys, p: Packet): Boolean =
         (p.flags and PacketFlags.SIGNED) != 0 && Crypto.verifyPacket(pinned.sig, p)
 
-    /** For a reply or distance update signed by a rescuer: the rescuer's verified certificate, or null. */
+    /**
+     * For a reply, distance update or hazard marker signed by a rescuer: the rescuer's verified certificate, or null
+     * (also null when the base has revoked that rescuer ID).
+     */
     fun rescuerSigner(pinned: PinnedBaseKeys, p: Packet, now: Long): RescuerCert? {
-        if ((p.type != PacketType.ACK && p.type != PacketType.PROGRESS) || (p.flags and PacketFlags.SIGNED) == 0) return null
-        val ack = try {
-            AckPayload.fromBytes(p.payload)
+        if ((p.flags and PacketFlags.SIGNED) == 0) return null
+        val certText = try {
+            when (p.type) {
+                PacketType.ACK, PacketType.PROGRESS -> AckPayload.fromBytes(p.payload).cert
+                PacketType.HAZARD -> HazardPayload.fromBytes(p.payload).cert
+                else -> return null
+            }
         } catch (e: Exception) {
             return null
         }
-        if (ack.cert.isEmpty()) return null
+        if (certText.isEmpty()) return null
         val cert = try {
-            RescuerCert.fromBase64(ack.cert)
+            RescuerCert.fromBase64(certText)
         } catch (e: Exception) {
             return null
         }
         if (!cert.isValid(pinned.sig, now)) return null
+        if (Revocations.isRevoked(cert.rescuerId)) return null
         return if (Crypto.verifyPacket(cert.pub, p)) cert else null
     }
 }

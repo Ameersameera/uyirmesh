@@ -105,6 +105,15 @@ class PublicHub(private val ctx: Context) {
     }
 
     fun onAlert(p: Packet, a: AlertPayload) {
+        if (a.kind == AlertKind.GATEWAY) {
+            // The base announces the internet relay address; phones use it from now on (switch stays as the user set it).
+            val url = a.title.trim()
+            if (url.startsWith("http") && url != Graph.prefs.now.gatewayUrl) {
+                Graph.prefs.update { it.copy(gatewayUrl = url) }
+                Graph.log("NET", "Rescue base announced the internet relay: $url")
+            }
+            return
+        }
         val now = System.currentTimeMillis()
         val existing = store.alerts.value.firstOrNull { it.id == a.alertId }
         val item = AlertItem(
@@ -159,6 +168,8 @@ class PublicHub(private val ctx: Context) {
             AlertKind.SHELTER -> L.t("alert_shelter")
             AlertKind.MISSING -> L.t("alert_missing")
             AlertKind.ALL_CLEAR -> L.t("alert_all_clear")
+            AlertKind.OFFICIAL -> L.t("alert_official")
+            AlertKind.BLOOD -> L.t("alert_blood")
             else -> L.t("alert_info")
         }
     }

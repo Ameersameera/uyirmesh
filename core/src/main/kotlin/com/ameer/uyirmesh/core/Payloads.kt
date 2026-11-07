@@ -216,6 +216,15 @@ object AlertKind {
     const val INFO = "INFO"
     const val MISSING = "MISSING"
     const val ALL_CLEAR = "ALL_CLEAR"
+
+    /** Warning passed on from the government (IMD, NDMA, district office); the source goes in the title. */
+    const val OFFICIAL = "OFFICIAL"
+
+    /** Blood donors needed; the blood group is in [AlertPayload.blood]. */
+    const val BLOOD = "BLOOD"
+
+    /** Internal: the internet relay address in the title. Never shown as an alert. */
+    const val GATEWAY = "GATEWAY"
     val ALL = listOf(EVACUATE, DANGER, SHELTER, INFO, MISSING, ALL_CLEAR)
 }
 
@@ -232,11 +241,14 @@ data class AlertPayload(
     val occupancy: Int = 0,
     val validUntil: Long = 0,
     val at: Long = 0,
+    /** For a BLOOD alert: the blood group needed ("O+", "B-", "any"). */
+    val blood: String = "",
 ) {
     fun toBytes(): ByteArray = Json.toBytes(
         linkedMapOf(
             "a" to alertId, "k" to kind, "sv" to severity, "ti" to title, "m" to message, "la" to lat.r6(),
             "lo" to lon.r6(), "r" to radiusM, "cp" to capacity, "oc" to occupancy, "vu" to validUntil, "t" to at,
+            "bg" to blood,
         )
     )
 
@@ -246,7 +258,7 @@ data class AlertPayload(
             return AlertPayload(
                 m.str("a"), m.str("k", AlertKind.INFO), m.int("sv", 1).coerceIn(1, 3), m.str("ti").take(80),
                 m.str("m").take(500), m.doubleOrNull("la"), m.doubleOrNull("lo"), m.int("r"), m.int("cp"),
-                m.int("oc"), m.long("vu"), m.long("t"),
+                m.int("oc"), m.long("vu"), m.long("t"), m.str("bg").take(8),
             )
         }
     }
@@ -448,11 +460,13 @@ data class TaskStatusPayload(
     /** When the GPS fix in [lat]/[lon] was taken (sender's clock), 0 if unknown. */
     val locAt: Long = 0,
     val battery: Int = -1,
+    /** When a case is closed: what happened ("3 rescued, 1 injured, taken to Govt Hospital"). */
+    val outcome: String = "",
 ) {
     fun toBytes(): ByteArray = Json.toBytes(
         linkedMapOf(
             "c" to caseId, "ri" to rescuerId, "rn" to rescuerName, "tm" to team, "s" to status,
-            "la" to lat.r6(), "lo" to lon.r6(), "t" to at, "lt" to locAt, "b" to battery,
+            "la" to lat.r6(), "lo" to lon.r6(), "t" to at, "lt" to locAt, "b" to battery, "oc" to outcome,
         )
     )
 
@@ -461,7 +475,7 @@ data class TaskStatusPayload(
             val m = Json.objectFromBytes(b)
             return TaskStatusPayload(
                 m.str("c"), m.str("ri"), m.str("rn").take(60), m.str("tm"), m.str("s"), m.doubleOrNull("la"),
-                m.doubleOrNull("lo"), m.long("t"), m.long("lt"), m.int("b", -1),
+                m.doubleOrNull("lo"), m.long("t"), m.long("lt"), m.int("b", -1), m.str("oc").take(200),
             )
         }
     }

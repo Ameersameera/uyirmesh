@@ -2,6 +2,10 @@
 
 package com.ameer.uyirmesh.ui
 
+import androidx.compose.ui.platform.LocalContext
+
+import com.ameer.uyirmesh.rescuer.TeamVoice
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -302,6 +306,7 @@ private fun TeamTab(nav: Nav) {
             KeyValue(tr("signed_by"), Graph.pinned.sigFingerprint)
         }
         MenuTile(Ic.Chat, tr("team_chat"), tr("team_chat_sub"), Palette.Blue) { nav.go("team_chat") }
+        MenuTile(Ic.Hazard, tr("mark_hazard"), tr("mark_hazard_sub"), Palette.Red) { nav.go("hazard") }
         MenuTile(Ic.QrScan, tr("scan_victim_qr"), tr("scan_victim_qr_sub"), Palette.Red) { nav.go("scan/victim") }
         MenuTile(Ic.Network, tr("network_status"), tr("network_status_sub"), Palette.Teal) { nav.go("network") }
         MenuTile(Ic.Healing, tr("first_aid"), tr("first_aid_sub"), Palette.Red) { nav.go("firstaid") }
@@ -321,6 +326,13 @@ fun TaskScreen(nav: Nav, caseId: String) {
     val tasks by Graph.store.tasks.flow.collectAsStateWithLifecycle()
     val loc by Graph.loc.lastFlow.collectAsStateWithLifecycle()
     val t = tasks.firstOrNull { it.caseId == caseId }
+    var askOutcome by remember { mutableStateOf(false) }
+    if (askOutcome && t != null) {
+        OutcomeDialog(t.people, onDone = { outcome ->
+            askOutcome = false
+            Graph.rescuer.setTaskState(t.caseId, TaskState.RESCUED, outcome)
+        }, onDismiss = { askOutcome = false })
+    }
     Scaffold(topBar = { ScreenBar(tr("task"), { nav.back() }) }) { pad ->
         if (t == null) {
             Column(Modifier.padding(pad)) { EmptyState(Ic.Task, tr("task_missing")) }
@@ -362,7 +374,7 @@ fun TaskScreen(nav: Nav, caseId: String) {
             when (t.state) {
                 TaskItem.NEW -> PrimaryButton(tr("accept"), Ic.Check) { Graph.rescuer.setTaskState(t.caseId, TaskState.ACCEPTED) }
                 TaskState.ACCEPTED -> PrimaryButton(tr("on_my_way"), Ic.Run, color = Palette.Orange) { Graph.rescuer.setTaskState(t.caseId, TaskState.ON_THE_WAY) }
-                TaskState.ON_THE_WAY -> PrimaryButton(tr("rescued"), Ic.CheckCircle, color = Palette.Green) { Graph.rescuer.setTaskState(t.caseId, TaskState.RESCUED) }
+                TaskState.ON_THE_WAY -> PrimaryButton(tr("rescued"), Ic.CheckCircle, color = Palette.Green) { askOutcome = true }
                 else -> Text(taskStateLabel(t.state), fontWeight = FontWeight.Bold)
             }
             if (t.state != TaskState.RESCUED && t.state != TaskState.UNABLE) {
@@ -397,8 +409,17 @@ fun TeamChatScreen(nav: Nav) {
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state, contentPadding = PaddingValues(12.dp)) {
                 if (msgs.isEmpty()) item { EmptyState(Ic.Chat, tr("no_messages")) }
-                items(msgs, key = { it.id }) { m -> Bubble(m.name, m.text, m.at, m.mine) }
+                items(msgs, key = { it.id }) { m ->
+                    if (m.audio.isNotBlank()) {
+                        val ctx = LocalContext.current
+                        Bubble(m.name, "${m.text} (${m.durationMs / 1000}s)", m.at, m.mine)
+                        TonalButton(tr("play_voice"), Ic.Play, Modifier.padding(start = if (m.mine) 48.dp else 0.dp, bottom = 4.dp)) { TeamVoice.play(ctx, m) }
+                    } else {
+                        Bubble(m.name, m.text, m.at, m.mine)
+                    }
+                }
             }
+            PushToTalkButton(if (isBase) team else (Graph.rescuer.bundle()?.cert?.team ?: ""))
             MessageInput(text, { text = it }) {
                 if (isBase) {
                     if (team.isNotBlank()) Graph.base.sendTeamChat(team, text)

@@ -48,7 +48,10 @@ class MainActivity : ComponentActivity() {
             nav.go("safe")
             return
         }
-        when (i.getStringExtra(EXTRA_OPEN)) {
+        val open = i.getStringExtra(EXTRA_OPEN)
+        if (open != null && open.startsWith("poll/")) nav.go(open)
+        when (open) {
+            "team_chat" -> nav.go("team_chat")
             "sos_status" -> nav.go("sos_status")
             "alerts" -> nav.go("alerts")
             "chat" -> nav.go("chat")

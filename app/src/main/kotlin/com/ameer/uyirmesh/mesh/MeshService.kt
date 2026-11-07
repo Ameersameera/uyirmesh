@@ -72,6 +72,18 @@ class MeshService : LifecycleService() {
                 }
             }
         }
+        // Internet relay: whenever this phone has internet, exchange packets with the relay server.
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            delay(15_000)
+            while (true) {
+                try {
+                    Graph.gateway.cycle()
+                } catch (e: Exception) {
+                    Graph.note("internet relay", e)
+                }
+                delay(30_000)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

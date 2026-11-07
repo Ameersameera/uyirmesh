@@ -27,7 +27,31 @@ enum class PacketType(val code: Int, val qos: Int) {
     MISSING(17, 2),
 
     /** A rescuer on the way tells the victim how far away they are (rescuer-signed, kept only an hour). */
-    PROGRESS(18, 2);
+    PROGRESS(18, 2),
+
+    /** Push-to-talk voice clip for a rescue team (team-encrypted). */
+    TEAM_VOICE(19, 3),
+
+    /** Danger marked by a rescuer (rescuer-signed) or the base (base-signed). */
+    HAZARD(20, 1),
+
+    /** Question or roll call from the base (base-signed). */
+    POLL(21, 1),
+
+    /** Answer to a poll (sealed for the base). */
+    POLL_ANSWER(22, 2),
+
+    /** Case status shared between several rescue bases (base-signed). */
+    BASE_SYNC(23, 1),
+
+    /** Rescuer IDs that are no longer valid (base-signed). */
+    REVOKE(24, 1),
+
+    /** Reading from a Bluetooth sensor node passed on by a phone (not signed). */
+    SENSOR(25, 2),
+
+    /** "I found your child" for the parent's phone (encrypted with the wristband key). */
+    CHILD_FOUND(26, 1);
 
     companion object {
         private val byCode = entries.associateBy { it.code }
