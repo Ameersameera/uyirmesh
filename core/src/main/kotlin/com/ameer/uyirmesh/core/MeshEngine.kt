@@ -29,12 +29,14 @@ class MeshMetrics {
     @Volatile var forgedDrops = 0L
     @Volatile var ttlStops = 0L
     @Volatile var sendFailures = 0L
+    @Volatile var powerSkips = 0L
 
     fun snapshot(): Map<String, Long> = linkedMapOf(
         "received" to received, "consumed" to consumed, "originated" to originated, "relayed" to relayed,
         "transmissions" to transmissions, "duplicates" to duplicates, "crcDrops" to crcDrops,
         "formatDrops" to formatDrops, "replayDrops" to replayDrops, "rateDrops" to rateDrops,
         "forgedDrops" to forgedDrops, "ttlStops" to ttlStops, "sendFailures" to sendFailures,
+        "powerSkips" to powerSkips,
     )
 }
 
@@ -54,6 +56,8 @@ enum class Drop { CRC, FORMAT, DUPLICATE, REPLAY, RATE, FORGED }
  *    source (rate limit) are dropped.
  *  - Every phone keeps forwarding packets for the rescue side, also the base and rescuers that read them, so a
  *    rescuer in the middle or at the end of the chain gets them.
+ *  - On a low battery a phone can stop relaying bulky voice/photo (and then chat) for others ([relayMaxQos]);
+ *    its own SOS and the SOS of others are always passed on.
  *
  * Thread-safe: all public methods are synchronized.
  */
@@ -81,10 +85,17 @@ class MeshEngine(
     /** Returns false for packets that claim to come from the base but are not correctly signed. */
     @Volatile var validator: ((Packet) -> Boolean)? = null
 
+    /**
+     * Battery-aware relaying: packets of a QoS class above this are still read but no longer passed on for other
+     * phones (3 = relay everything, 2 = skip voice/photo, 1 = only SOS, replies and alerts). Own packets are always sent.
+     */
+    @Volatile var relayMaxQos: Int = 3
+
     private val seen = LinkedHashMap<String, Long>(1024)
     private val buffer = LinkedHashMap<String, Entry>(256)
     private val neighbours = LinkedHashSet<String>()
     private val rate = HashMap<String, ArrayDeque<Long>>()
+    private val heard = HashMap<String, Long>()
 
     /** Called for locally originated packets when they are first handed to at least one neighbour. */
     var onFirstHandOff: ((Packet, Int) -> Unit)? = null
@@ -151,10 +162,13 @@ class MeshEngine(
             return Incoming(p, false, false, Drop.RATE)
         }
         remember(p.idHex)
+        noteHeard(p.src, now)
         val consume = isForMe(p)
         if (consume) metrics.consumed++
         var forwarded = false
-        if (shouldForward(p)) {
+        if (shouldForward(p) && p.qos > relayMaxQos) {
+            metrics.powerSkips++
+        } else if (shouldForward(p)) {
             if (p.ttl > 0) {
                 putInBuffer(Entry(p, now, fromNeighbour))
                 forwarded = true
@@ -250,11 +264,19 @@ class MeshEngine(
         e.packet.ttl > 0 && neighbours.any { it != e.from && it != e.packet.src && it !in e.sentTo }
     }
 
+    /** How many different phones were heard (as senders of accepted packets) in the last [windowMs]: a rough crowd count. */
+    @Synchronized
+    fun phonesHeard(windowMs: Long): Int {
+        val now = clock()
+        return heard.values.count { now - it <= windowMs }
+    }
+
     @Synchronized
     fun clear() {
         buffer.clear()
         seen.clear()
         rate.clear()
+        heard.clear()
     }
 
     /* ---------------- rules ---------------- */
@@ -300,7 +322,7 @@ class MeshEngine(
         // Replies, alerts and tasks are signed by the base (checked by the validator before this point).
         if (p.type == PacketType.ACK || p.type == PacketType.ALERT || p.type == PacketType.TASK ||
             p.type == PacketType.FIND_RESULT || p.type == PacketType.POLL || p.type == PacketType.BASE_SYNC ||
-            p.type == PacketType.REVOKE
+            p.type == PacketType.REVOKE || p.type == PacketType.BASE_BEACON
         ) return false
         val q = rate.getOrPut(p.src) { ArrayDeque() }
         while (q.isNotEmpty() && now - q.first() > 60_000) q.removeFirst()
@@ -310,6 +332,11 @@ class MeshEngine(
             rate.entries.removeIf { it.value.isEmpty() || now - it.value.last() > 60_000 }
         }
         return false
+    }
+
+    private fun noteHeard(src: String, now: Long) {
+        heard[src] = now
+        if (heard.size > 5_000) heard.entries.removeIf { now - it.value > 3600_000 }
     }
 
     private fun putInBuffer(e: Entry) {

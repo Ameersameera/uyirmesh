@@ -112,6 +112,7 @@ private fun Route(nav: Nav, role: String) {
         "hazard" -> HazardScreen(nav)
         "base_polls" -> BasePollsScreen(nav)
         "base_ids" -> BaseRescuerIdsScreen(nav)
+        "relay" -> RelayModeScreen(nav)
         else -> PublicHome(nav)
     }
 }

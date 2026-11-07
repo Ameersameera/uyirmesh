@@ -10,8 +10,17 @@ import com.ameer.uyirmesh.core.AlertPayload
 import com.ameer.uyirmesh.core.B64
 import com.ameer.uyirmesh.core.BaseKeyFile
 import com.ameer.uyirmesh.core.BasePrivateKeys
+import com.ameer.uyirmesh.core.CaseFacts
 import com.ameer.uyirmesh.core.Credentials
 import com.ameer.uyirmesh.core.Crypto
+import com.ameer.uyirmesh.core.Duplicates
+import com.ameer.uyirmesh.core.EtaModel
+import com.ameer.uyirmesh.core.EtaSample
+import com.ameer.uyirmesh.core.Planner
+import com.ameer.uyirmesh.core.Revocations
+import com.ameer.uyirmesh.core.SosChecks
+import com.ameer.uyirmesh.core.TeamSlot
+import com.ameer.uyirmesh.core.WaitingCase
 import com.ameer.uyirmesh.core.Destinations
 import com.ameer.uyirmesh.core.FindMatch
 import com.ameer.uyirmesh.core.FindRequest
@@ -188,7 +197,9 @@ class BaseBrain(private val ctx: Context) {
         k
     }
 
-    fun teams(): List<String> = store.rescuers.value.filter { it.expiresAt > System.currentTimeMillis() }.map { it.team }.distinct().sorted()
+    fun teams(): List<String> = store.rescuers.value
+        .filter { it.expiresAt > System.currentTimeMillis() && !Revocations.isRevoked(it.rescuerId) }
+        .map { it.team }.distinct().sorted()
 
     /** Creates a rescuer ID and returns the PIN-protected QR text. */
     fun issueRescuer(name: String, team: String, days: Int, pin: CharArray): String {
@@ -249,7 +260,14 @@ class BaseBrain(private val ctx: Context) {
                 events = existing.events + CaseEvent(now, "SOS", "SOS sent again (${existing.repeats + 2} times)"),
             )
         }
-        if (existing == null) c = c.copy(duplicateOf = findDuplicate(c, now))
+        if (existing == null) {
+            findDuplicate(c)?.let { (of, why) ->
+                c = c.copy(duplicateOf = of, events = c.events + CaseEvent(now, "DUPLICATE", "Probably the same people as case ${of.take(6)} ($why)"))
+            }
+        } else if (hasLoc && existing.lat != null && existing.lon != null) {
+            SosChecks.jump(existing.lat, existing.lon, existing.locAt ?: existing.lastAt, s.lat!!, s.lon!!, s.locTime ?: now)?.let { j -> c = withFlags(c, c.flags + j, now) }
+        }
+        c = withFlags(c, SosChecks.merge(c.flags, sosFlags(c, p.createdAt, now)), now)
         c = score(c, now)
         store.cases.upsert({ it.caseId }, c)
         replyTo(c, AckStatus.RECEIVED, "", -1, "", p.hops, pathNames(p))
@@ -261,14 +279,45 @@ class BaseBrain(private val ctx: Context) {
         }
     }
 
-    private fun findDuplicate(c: CaseItem, now: Long): String {
-        val lat = c.lat ?: return ""
-        val lon = c.lon ?: return ""
-        return store.cases.value.firstOrNull { o ->
-            o.caseId != c.caseId && o.victim != c.victim && o.isOpen && o.payload.kind == c.payload.kind &&
-                now - o.firstAt < 30 * 60_000 && o.lat != null && o.lon != null &&
-                Geo.distanceM(lat, lon, o.lat, o.lon) < 30
-        }?.let { it.duplicateOf.ifBlank { it.caseId } } ?: ""
+    private fun facts(c: CaseItem): CaseFacts {
+        val p = c.payload
+        return CaseFacts(
+            c.caseId, c.victim, p.kind, c.firstAt, c.lat, c.lon,
+            if (p.forOther) p.otherName else p.name, if (p.forOther) p.otherPhone else p.phone,
+        )
+    }
+
+    /** An open case about the same people (same spot, same phone number, or the same name nearby) and why. */
+    private fun findDuplicate(c: CaseItem): Pair<String, String>? {
+        val me = facts(c)
+        for (o in store.cases.value) {
+            if (!o.isOpen || o.caseId == c.caseId) continue
+            val why = Duplicates.reason(me, facts(o)) ?: continue
+            return o.duplicateOf.ifBlank { o.caseId } to why
+        }
+        return null
+    }
+
+    /** Warning signs for the dispatcher (never used to lower the score). */
+    private fun sosFlags(c: CaseItem, createdAt: Long, now: Long): List<String> {
+        val day = 24 * 3600_000L
+        val same = store.cases.value.filter { it.victim == c.victim && it.caseId != c.caseId }
+        val cancels = same.count { it.cancelledAt > 0 && now - it.cancelledAt < day } + if (c.cancelledAt > 0 && now - c.cancelledAt < day) 1 else 0
+        return SosChecks.flags(
+            SosChecks.Input(
+                now = now, createdAt = createdAt, hasPosition = c.lat != null, messages = c.repeats + 1,
+                otherRecentCases = same.count { now - it.firstAt < SosChecks.BURST_WINDOW_MS }, recentCancels = cancels,
+            ),
+        )
+    }
+
+    /** Sets the flags and notes newly found ones in the case history. */
+    private fun withFlags(c: CaseItem, flags: List<String>, now: Long): CaseItem {
+        val fresh = flags.distinct()
+        val added = fresh.filter { f -> c.flags.none { it.substringBefore(':') == f.substringBefore(':') } }
+        if (added.isEmpty() && fresh == c.flags) return c
+        if (added.isNotEmpty()) Graph.log("BASE", "Case ${c.caseId.take(6)} flagged: ${added.joinToString()}")
+        return c.copy(flags = fresh, events = c.events + added.map { CaseEvent(now, "CHECK", "Check this SOS: $it") })
     }
 
     @Synchronized
@@ -277,13 +326,15 @@ class BaseBrain(private val ctx: Context) {
         val c = store.cases.value.firstOrNull { it.caseId == u.caseId && it.victim == p.src } ?: return
         val hasLoc = Geo.isValid(u.lat, u.lon)
         val moved = if (hasLoc && c.lat != null && c.lon != null) Geo.distanceM(c.lat, c.lon, u.lat!!, u.lon!!) else 0.0
+        val jump = if (hasLoc && c.lat != null && c.lon != null) SosChecks.jump(c.lat, c.lon, c.locAt ?: c.lastAt, u.lat!!, u.lon!!, u.locTime ?: now) else null
+        val flagged = if (jump != null) withFlags(c, c.flags + jump, now) else c
         val updated = score(
-            c.copy(
+            flagged.copy(
                 lastAt = now, lat = if (hasLoc) u.lat else c.lat, lon = if (hasLoc) u.lon else c.lon,
                 accuracy = if (hasLoc) u.accuracy else c.accuracy, locAt = if (hasLoc) u.locTime else c.locAt,
                 battery = if (u.battery >= 0) u.battery else c.battery, lowBattery = c.lowBattery || u.lowBattery,
                 track = if (hasLoc) (c.track + TrackPoint(u.lat!!, u.lon!!, u.locTime ?: now, u.battery)).takeLast(200) else c.track,
-                events = if (u.lowBattery) c.events + CaseEvent(now, "BATTERY", "Victim battery low (${u.battery}%), last position sent") else c.events,
+                events = if (u.lowBattery) flagged.events + CaseEvent(now, "BATTERY", "Victim battery low (${u.battery}%), last position sent") else flagged.events,
             ),
             now,
         )
@@ -337,10 +388,31 @@ class BaseBrain(private val ctx: Context) {
     private fun activeTasks(team: String) = store.cases.value.count { it.team == team && (it.status == CaseStatus.ASSIGNED || it.status == CaseStatus.ON_THE_WAY) }
 
     fun etaFor(team: String, c: CaseItem): Int {
-        val from = teamPosition(team) ?: return -1
-        val lat = c.lat ?: return -1
-        val lon = c.lon ?: return -1
-        return Geo.etaMinutes(Geo.distanceM(from.lat, from.lon, lat, lon), Graph.prefs.now.speedKmh.toDouble())
+        val d = distanceFor(team, c) ?: return -1
+        return etaModel(team).minutes(d)
+    }
+
+    private fun distanceFor(team: String, c: CaseItem): Double? {
+        val from = teamPosition(team) ?: return null
+        val lat = c.lat ?: return null
+        val lon = c.lon ?: return null
+        return Geo.distanceM(from.lat, from.lon, lat, lon)
+    }
+
+    /** Finished rescues the ETA model learns from: distance when the team set off and minutes until "rescued". */
+    fun etaSamples(team: String = ""): List<EtaSample> = store.cases.value.filter { c ->
+        val start = if (c.onWayAt > 0) c.onWayAt else c.assignedAt
+        c.status == CaseStatus.RESCUED && c.departDistM > 0 && start > 0 && c.rescuedAt > start && (team.isBlank() || c.team == team)
+    }.map { c -> EtaSample(c.departDistM.toDouble(), (c.rescuedAt - (if (c.onWayAt > 0) c.onWayAt else c.assignedAt)) / 60_000.0) }
+
+    /** ETA model for a team: its own finished rescues once it has two, otherwise those of all teams. */
+    fun etaModel(team: String = ""): EtaModel {
+        val speed = Graph.prefs.now.speedKmh.toDouble()
+        if (team.isNotBlank()) {
+            val own = etaSamples(team)
+            if (own.size >= 2) return EtaModel(speed, own)
+        }
+        return EtaModel(speed, etaSamples())
     }
 
     @Synchronized
@@ -349,8 +421,10 @@ class BaseBrain(private val ctx: Context) {
         val clean = Credentials.cleanTeamName(team)
         val now = System.currentTimeMillis()
         val eta = etaFor(clean, c)
+        val dist = distanceFor(clean, c)
         val updated = c.copy(
             status = CaseStatus.ASSIGNED, team = clean, etaMin = eta, assignedAt = now,
+            departDistM = dist?.toInt() ?: c.departDistM,
             events = c.events + CaseEvent(now, "ASSIGN", "Assigned to team $clean by $by${if (eta > 0) ", ETA $eta min" else ""}"),
         )
         store.cases.upsert({ it.caseId }, updated)
@@ -368,6 +442,7 @@ class BaseBrain(private val ctx: Context) {
             status = status,
             rescuedAt = if (status == CaseStatus.RESCUED) now else c.rescuedAt,
             onWayAt = if (status == CaseStatus.ON_THE_WAY) now else c.onWayAt,
+            departDistM = if (status == CaseStatus.ON_THE_WAY) distanceFor(c.team, c)?.toInt() ?: c.departDistM else c.departDistM,
             events = c.events + CaseEvent(now, "STATUS", "Marked ${status.lowercase()} at the base"),
         )
         store.cases.upsert({ it.caseId }, updated)
@@ -378,22 +453,45 @@ class BaseBrain(private val ctx: Context) {
         }
     }
 
-    /** Picks a team for every waiting case, most urgent first: nearest team with the fewest open tasks. */
+    /**
+     * Gives waiting cases to teams with free places using the optimal plan ([Planner], Hungarian method): the most
+     * urgent cases first and, among similar ones, the nearest team, best for all cases together. A duplicate goes
+     * to the team of its original case. Returns how many cases were assigned.
+     */
     @Synchronized
-    fun autoAssign() {
+    fun autoAssign(by: String = "auto-assign"): Int {
         val teams = teams()
-        if (teams.isEmpty()) return
+        if (teams.isEmpty()) return 0
         // Cases another base is already handling (multi-base sync) are left to that base.
-        val waiting = store.cases.value.filter { it.status == CaseStatus.NEW && it.handledBy.isBlank() }.sortedByDescending { it.score }
-        for (c in waiting) {
-            val dupTeam = store.cases.value.firstOrNull { it.caseId == c.duplicateOf && it.team.isNotBlank() }?.team
-            val choice = dupTeam ?: teams.filter { activeTasks(it) < MAX_ACTIVE_PER_TEAM }.minByOrNull { t ->
-                val pos = teamPosition(t)
-                val km = if (pos != null && c.lat != null && c.lon != null) Geo.distanceM(pos.lat, pos.lon, c.lat, c.lon) / 1000 else 5.0
-                km + 2.0 * activeTasks(t)
-            } ?: continue
-            assign(c.caseId, choice, by = "auto-assign")
+        fun waiting() = store.cases.value.filter { it.status == CaseStatus.NEW && it.handledBy.isBlank() }
+        fun originalOf(c: CaseItem) = if (c.duplicateOf.isBlank()) null else store.cases.value.firstOrNull { it.caseId == c.duplicateOf }
+        var count = 0
+        fun followOriginals() {
+            for (c in waiting()) {
+                val team = originalOf(c)?.takeIf { it.isOpen && it.team.isNotBlank() }?.team ?: continue
+                assign(c.caseId, team, by)
+                count++
+            }
         }
+        followOriginals()
+        // Plan the rest; a duplicate whose original is still waiting follows it afterwards.
+        val rest = waiting().filter { c -> originalOf(c)?.isOpen != true }
+        if (rest.isNotEmpty()) {
+            val models = teams.associateWith { etaModel(it) }
+            val slots = teams.map { t ->
+                val pos = teamPosition(t)
+                TeamSlot(t, pos?.lat, pos?.lon, MAX_ACTIVE_PER_TEAM - activeTasks(t))
+            }.filter { it.free > 0 }
+            val plan = Planner.plan(slots, rest.map { WaitingCase(it.caseId, it.lat, it.lon, it.score) }) { t, w ->
+                models.getValue(t.team).minutes(Geo.distanceM(t.lat!!, t.lon!!, w.lat!!, w.lon!!))
+            }
+            for (pick in plan) {
+                assign(pick.caseId, pick.team, by)
+                count++
+            }
+            followOriginals()
+        }
+        return count
     }
 
     private fun sendTask(c: CaseItem, cancelled: Boolean = false) {
@@ -439,9 +537,8 @@ class BaseBrain(private val ctx: Context) {
                 .movedTo(st.lat, st.lon, if (st.locAt > 0) st.locAt else st.at, now)
         }
         val c = store.cases.value.firstOrNull { it.caseId == st.caseId } ?: return
-        val eta = if (Geo.isValid(st.lat, st.lon) && c.lat != null && c.lon != null) {
-            Geo.etaMinutes(Geo.distanceM(st.lat!!, st.lon!!, c.lat, c.lon), Graph.prefs.now.speedKmh.toDouble())
-        } else c.etaMin
+        val dist = if (Geo.isValid(st.lat, st.lon) && c.lat != null && c.lon != null) Geo.distanceM(st.lat!!, st.lon!!, c.lat, c.lon) else null
+        val eta = if (dist != null) etaModel(st.team.ifBlank { c.team }).minutes(dist) else c.etaMin
         val (status, ack) = when (st.status) {
             TaskState.ACCEPTED -> CaseStatus.ASSIGNED to AckStatus.ASSIGNED
             TaskState.ON_THE_WAY -> CaseStatus.ON_THE_WAY to AckStatus.ON_THE_WAY
@@ -455,6 +552,7 @@ class BaseBrain(private val ctx: Context) {
             onWayAt = if (status == CaseStatus.ON_THE_WAY && c.onWayAt == 0L) now else c.onWayAt,
             rescuedAt = if (status == CaseStatus.RESCUED) now else c.rescuedAt,
             outcome = st.outcome.ifBlank { c.outcome },
+            departDistM = if (status == CaseStatus.ON_THE_WAY && c.onWayAt == 0L && dist != null) dist.toInt() else c.departDistM,
             events = c.events + CaseEvent(now, "TEAM", "${st.rescuerName} (${st.team}): ${st.status.lowercase().replace('_', ' ')}${if (st.outcome.isNotBlank()) " · ${st.outcome}" else ""}"),
         )
         store.cases.upsert({ it.caseId }, updated)

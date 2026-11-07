@@ -173,6 +173,12 @@ private fun RescuerHome(nav: Nav) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 color = if (peers > 0) Palette.Green else Palette.Orange,
             )
+            Text(
+                baseContactText() + (powerNote()?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Column(Modifier.padding(horizontal = 16.dp)) { LocationQualityCard() }
             when (tab) {
                 0 -> TaskList(nav)

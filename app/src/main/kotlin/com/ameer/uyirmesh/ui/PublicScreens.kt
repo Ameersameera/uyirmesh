@@ -203,6 +203,8 @@ fun MeshStatusCard(peers: Int, waiting: Int, running: Boolean, onClick: () -> Un
                     if (waiting > 0) tr("mesh_waiting").replace("{n}", waiting.toString()) else tr("mesh_works_offline"),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                Text(baseContactText(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                powerNote()?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.Orange) }
             }
             Icon(Ic.Arrow, null)
         }
@@ -471,7 +473,7 @@ fun SosStatusScreen(nav: Nav) {
                 if (recording >= 0) {
                     InfoCard(color = Palette.Red.copy(alpha = 0.12f)) {
                         Text(tr("recording").replace("{n}", recording.toString()), fontWeight = FontWeight.Bold)
-                        LinearProgressIndicator(progress = { (recording / 15f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
+                        LinearProgressIndicator(progress = { (recording / VoiceNote.limitSeconds.toFloat()).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
                         ButtonRow {
                             TonalButton(tr("stop_and_send"), Ic.Send, Modifier.weight(1f)) { VoiceNote.stopNow() }
                             TonalButton(tr("discard"), Ic.Delete, Modifier.weight(1f)) { VoiceNote.discard() }
@@ -484,6 +486,7 @@ fun SosStatusScreen(nav: Nav) {
                         }
                         TonalButton(tr("photo"), Ic.Camera, Modifier.weight(1f)) { nav.go("photo") }
                     }
+                    WeakLinkNote()
                 }
                 ButtonRow {
                     TonalButton(tr("update_location"), Ic.MyLocation, Modifier.weight(1f)) {

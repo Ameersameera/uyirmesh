@@ -73,9 +73,15 @@ object Opener {
 
 /** Checks that messages which only the base (or a verified rescuer) may send are genuine. */
 object Authenticity {
+    /** Types that only the base can send: [check] accepts them only with a valid base signature. */
+    val BASE_ONLY: Set<PacketType> = setOf(
+        PacketType.ALERT, PacketType.TASK, PacketType.FIND_RESULT, PacketType.POLL, PacketType.BASE_SYNC,
+        PacketType.REVOKE, PacketType.BASE_BEACON,
+    )
+
     fun check(pinned: PinnedBaseKeys, p: Packet, now: Long): Boolean = when (p.type) {
         PacketType.ALERT, PacketType.TASK, PacketType.FIND_RESULT, PacketType.POLL, PacketType.BASE_SYNC,
-        PacketType.REVOKE -> isBaseSigned(pinned, p)
+        PacketType.REVOKE, PacketType.BASE_BEACON -> isBaseSigned(pinned, p)
         PacketType.ACK, PacketType.HAZARD -> isBaseSigned(pinned, p) || rescuerSigner(pinned, p, now) != null
         PacketType.PROGRESS -> rescuerSigner(pinned, p, now) != null
         else -> true

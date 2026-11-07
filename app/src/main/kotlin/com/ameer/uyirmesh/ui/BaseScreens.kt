@@ -239,6 +239,7 @@ private fun CaseList(nav: Nav) {
                 FilterChip(selected = filter == 2, onClick = { filter = 2 }, label = { Text(tr("all_cases")) })
             }
             CaseSummaryBar(cases)
+            AssignAllButton()
         }
         if (list.isEmpty()) item { EmptyState(Ic.Sos, tr("no_cases")) }
         items(list, key = { it.caseId }) { c -> CaseCard(c) { nav.go("case/${c.caseId}") } }
@@ -401,6 +402,7 @@ private fun TeamsTab(nav: Nav) {
                 if (v) Graph.base.autoAssign()
             }
             Stepper(tr("team_speed"), s.speedKmh, 2, 80, Ic.Run) { v -> Graph.prefs.update { it.copy(speedKmh = v) } }
+            LearnedEtaNote()
             MenuTile(Ic.Chat, tr("team_chat"), tr("team_chat_base_sub"), Palette.Blue) { nav.go("team_chat") }
         }
         val teams = rescuers.groupBy { it.team }
@@ -501,6 +503,8 @@ private fun MoreTab(nav: Nav) {
     val missing by Graph.store.missing.flow.collectAsStateWithLifecycle()
     val safe by Graph.store.safe.flow.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
+    var secureExport by remember { mutableStateOf(false) }
+    if (secureExport) SecureExportDialog { secureExport = false }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         MenuTile(Ic.Alert, tr("send_alert"), tr("send_alert_sub"), Palette.Orange) { nav.go("base_alert") }
         MenuTile(Ic.HowToReg, tr("polls_rollcall"), tr("polls_rollcall_sub"), Palette.Purple) { nav.go("base_polls") }
@@ -516,6 +520,7 @@ private fun MoreTab(nav: Nav) {
             val f = Reports.writePdf(ctx)
             if (f != null) shareFile(ctx, f, "application/pdf", "UyirMesh report")
         }
+        MenuTile(Ic.Lock, tr("secure_export"), tr("secure_export_sub"), Palette.Teal) { secureExport = true }
         MenuTile(Ic.Chart, tr("statistics"), tr("statistics_sub"), Palette.Purple) { nav.go("web") }
         SectionTitle(tr("people_search"))
         Field(tr("search_name"), query, { query = it })

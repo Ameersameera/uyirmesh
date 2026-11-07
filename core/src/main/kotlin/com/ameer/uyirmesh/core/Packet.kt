@@ -51,7 +51,10 @@ enum class PacketType(val code: Int, val qos: Int) {
     SENSOR(25, 2),
 
     /** "I found your child" for the parent's phone (encrypted with the wristband key). */
-    CHILD_FOUND(26, 1);
+    CHILD_FOUND(26, 1),
+
+    /** Small "the base is here" message sent by the base every few minutes (base-signed), so phones can show how far the base is. */
+    BASE_BEACON(27, 2);
 
     companion object {
         private val byCode = entries.associateBy { it.code }

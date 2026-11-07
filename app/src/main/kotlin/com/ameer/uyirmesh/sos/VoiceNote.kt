@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.ameer.uyirmesh.Graph
+import com.ameer.uyirmesh.core.MediaLevel
 import com.ameer.uyirmesh.util.Perms
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,10 @@ object VoiceNote {
     val seconds: StateFlow<Int> = _seconds
 
     val recording: Boolean get() = recorder != null
+
+    /** Length limit of the note being recorded (shorter on a weak link). */
+    @Volatile var limitSeconds = 15
+        private set
 
     fun recordAndSend(ctx: Context, maxSeconds: Int = 15, done: ((Boolean) -> Unit)? = null) {
         main.post { start(ctx.applicationContext, maxSeconds, done) }
@@ -57,6 +62,14 @@ object VoiceNote {
             return
         }
         waitedForMic = false
+        // A weak link (no phone in range, base far away, low battery) gets a shorter, lower-bitrate note.
+        val level = try {
+            Graph.health.mediaLevel()
+        } catch (e: Exception) {
+            MediaLevel.NORMAL
+        }
+        val secs = minOf(maxSeconds, level.voiceSeconds)
+        limitSeconds = secs
         val f = File(ctx.cacheDir, "voice_${System.currentTimeMillis()}.amr")
         @Suppress("DEPRECATION")
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(ctx) else MediaRecorder()
@@ -66,8 +79,8 @@ object VoiceNote {
             r.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
             r.setAudioChannels(1)
             r.setAudioSamplingRate(8000)
-            r.setAudioEncodingBitRate(12200)
-            r.setMaxDuration(maxSeconds * 1000)
+            r.setAudioEncodingBitRate(level.voiceBitrate)
+            r.setMaxDuration(secs * 1000)
             r.setOutputFile(f.absolutePath)
             r.setOnInfoListener { _, what, _ ->
                 if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) finish(send = true)
@@ -90,8 +103,8 @@ object VoiceNote {
         startedAt = System.currentTimeMillis()
         onFinished = done
         _seconds.value = 0
-        Graph.log("SOS", "Recording voice note")
-        tick(maxSeconds)
+        Graph.log("SOS", "Recording voice note" + if (level != MediaLevel.NORMAL) " (weak link: ${level.voiceBitrate / 1000.0} kbit/s, up to $secs s)" else "")
+        tick(secs)
     }
 
     private fun tick(maxSeconds: Int) {

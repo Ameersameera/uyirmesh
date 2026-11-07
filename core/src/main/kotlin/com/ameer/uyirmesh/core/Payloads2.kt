@@ -315,3 +315,26 @@ object Names {
         return prev[b.length]
     }
 }
+
+/**
+ * "The rescue base is here": sent by the base every few minutes, signed with the base key. Phones use it to show
+ * how many hops away the base is and when they last heard from it, and the distance to the base.
+ */
+data class BeaconPayload(
+    val baseName: String,
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val openCases: Int = 0,
+    val at: Long = 0,
+) {
+    fun toBytes(): ByteArray = Json.toBytes(
+        linkedMapOf("bn" to baseName, "la" to lat.r6(), "lo" to lon.r6(), "oc" to openCases, "t" to at)
+    )
+
+    companion object {
+        fun fromBytes(b: ByteArray): BeaconPayload {
+            val m = Json.objectFromBytes(b)
+            return BeaconPayload(m.str("bn").take(40), m.doubleOrNull("la"), m.doubleOrNull("lo"), m.int("oc").coerceAtLeast(0), m.long("t"))
+        }
+    }
+}

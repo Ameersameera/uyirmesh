@@ -26,6 +26,7 @@ import com.ameer.uyirmesh.core.TaskPayload
 import com.ameer.uyirmesh.core.TaskStatusPayload
 import com.ameer.uyirmesh.core.TeamChatPayload
 import com.ameer.uyirmesh.core.VolunteerPayload
+import com.ameer.uyirmesh.core.BeaconPayload
 import com.ameer.uyirmesh.core.CaseSync
 import com.ameer.uyirmesh.core.HazardPayload
 import com.ameer.uyirmesh.core.PollAnswer
@@ -187,6 +188,11 @@ class Router {
             PacketType.SENSOR -> Graph.safety.onSensor(p, SensorPayload.fromBytes(p.payload))
 
             PacketType.CHILD_FOUND -> if (p.dst == myId) Graph.safety.onChildFound(p)
+
+            PacketType.BASE_BEACON -> {
+                if (!Authenticity.isBaseSigned(Graph.pinned, p)) return
+                Graph.health.onBeacon(p, BeaconPayload.fromBytes(p.payload))
+            }
         }
     }
 

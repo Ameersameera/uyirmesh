@@ -37,6 +37,12 @@ data class Settings(
     /** Internet relay: upload/download mesh packets whenever this phone has internet. */
     val gateway: Boolean = false,
     val gatewayUrl: String = "",
+    /** Old phone left on a charger as a fixed relay: keeps relaying everything for longer. */
+    val relayMode: Boolean = false,
+    /** Relay less (no voice/photo for others) and search less often when the battery is low. */
+    val autoPowerSave: Boolean = true,
+    /** Delete old messages and closed cases after this many days (0 = keep). */
+    val autoDeleteDays: Int = 0,
 )
 
 class Prefs(context: Context) {
@@ -75,6 +81,9 @@ class Prefs(context: Context) {
             simpleMode = sp.getBoolean("simpleMode", false),
             gateway = sp.getBoolean("gateway", false),
             gatewayUrl = sp.getString("gatewayUrl", "") ?: "",
+            relayMode = sp.getBoolean("relayMode", false),
+            autoPowerSave = sp.getBoolean("autoPowerSave", true),
+            autoDeleteDays = sp.getInt("autoDeleteDays", 0).coerceIn(0, 365),
         )
     }
 
@@ -105,6 +114,9 @@ class Prefs(context: Context) {
             .putBoolean("simpleMode", s.simpleMode)
             .putBoolean("gateway", s.gateway)
             .putString("gatewayUrl", s.gatewayUrl.take(120))
+            .putBoolean("relayMode", s.relayMode)
+            .putBoolean("autoPowerSave", s.autoPowerSave)
+            .putInt("autoDeleteDays", s.autoDeleteDays.coerceIn(0, 365))
             .apply()
         _settings.value = s
     }

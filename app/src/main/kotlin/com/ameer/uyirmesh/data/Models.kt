@@ -320,6 +320,8 @@ data class CaseItem(
     val flags: List<String> = emptyList(),
     /** What the rescue team reported when it closed the case ("3 rescued, 1 injured, taken to ..."). */
     val outcome: String = "",
+    /** How far the team was (metres) when it set off; with the time to "rescued" it teaches the ETA model. */
+    val departDistM: Int = -1,
 ) {
     val isOpen: Boolean get() = status in CaseStatus.OPEN
 
@@ -331,7 +333,7 @@ data class CaseItem(
         "rs" to reasons.map { linkedMapOf("l" to it.label, "p" to it.points) }, "pr" to proba,
         "st" to status, "tm" to team, "rn" to rescuerName, "e" to etaMin, "aa" to assignedAt, "ow" to onWayAt,
         "ra" to rescuedAt, "ca" to cancelledAt, "du" to duplicateOf, "dr" to drill, "ev" to events.map { it.toJson() },
-        "hb" to handledBy, "fl" to flags, "oc" to outcome,
+        "hb" to handledBy, "fl" to flags, "oc" to outcome, "dd" to departDistM,
     )
 
     companion object {
@@ -344,7 +346,7 @@ data class CaseItem(
             m.list("pr").mapNotNull { (it as? Number)?.toDouble() }, m.str("st", CaseStatus.NEW), m.str("tm"),
             m.str("rn"), m.int("e", -1), m.long("aa"), m.long("ow"), m.long("ra"), m.long("ca"), m.str("du"),
             m.bool("dr"), m.objs("ev").map { CaseEvent.from(it) },
-            handledBy = m.str("hb"), flags = m.strList("fl"), outcome = m.str("oc"),
+            handledBy = m.str("hb"), flags = m.strList("fl"), outcome = m.str("oc"), departDistM = m.int("dd", -1),
         )
     }
 }

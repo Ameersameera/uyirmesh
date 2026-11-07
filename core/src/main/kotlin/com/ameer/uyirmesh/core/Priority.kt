@@ -110,10 +110,14 @@ data class TriageInput(
     val injured: Boolean,
     val needs: Collection<String>,
     val battery: Int,
+    /** Free text typed by the victim: read by [NoteScan], not by the model. */
+    val note: String = "",
+    /** Pets or farm animals with the people (a small rule-based bonus, never above people). */
+    val animals: Int = 0,
 ) {
     companion object {
         fun from(p: SosPayload) = TriageInput(
-            p.kind, p.people, p.children, p.elderly, p.disabled, p.pregnant, p.injured, p.needs, p.battery,
+            p.kind, p.people, p.children, p.elderly, p.disabled, p.pregnant, p.injured, p.needs, p.battery, p.note, p.animals,
         )
     }
 }
@@ -132,6 +136,8 @@ data class PriorityResult(
  * Turns the model output into a 0-100+ urgency score with readable reasons.
  *  score = expected urgency from the class probabilities (Low 10, Medium 40, High 70, Critical 95)
  *        + aging (1 point per minute waiting, up to 30) + repeated messages (3 points each, up to 12)
+ *        + danger words in the note ([NoteScan], up to 15) + animals (1 point each, up to 4)
+ * The last two are plain rules on top of the model; the reasons list shows every part.
  */
 object Triage {
     val FEATURES = listOf(
@@ -140,6 +146,7 @@ object Triage {
         "need_water", "need_food", "need_medicine", "need_baby_food", "need_boat", "battery",
     )
     val CLASSES = listOf("Low", "Medium", "High", "Critical")
+    const val MAX_ANIMAL_POINTS = 4
     private val CLASS_POINTS = doubleArrayOf(10.0, 40.0, 70.0, 95.0)
 
     fun features(i: TriageInput): DoubleArray = doubleArrayOf(
@@ -200,9 +207,14 @@ object Triage {
         if (aging > 0) reasons.add(Reason("Waiting ${waitingMinutes.toInt()} min", aging))
         val repeatPts = minOf(12, repeats.coerceAtLeast(0) * 3)
         if (repeatPts > 0) reasons.add(Reason("Sent ${repeats + 1} times", repeatPts))
+        val noteReasons = NoteScan.reasons(input.note)
+        reasons.addAll(noteReasons)
+        val notePts = noteReasons.sumOf { it.points }
+        val animalPts = minOf(MAX_ANIMAL_POINTS, input.animals.coerceAtLeast(0))
+        if (animalPts > 0) reasons.add(Reason("${input.animals} ${if (input.animals == 1) "animal" else "animals"}", animalPts))
 
         val modelScore = expected.roundToInt()
-        val score = modelScore + aging + repeatPts
+        val score = modelScore + aging + repeatPts + notePts + animalPts
         val sorted = reasons.filter { it.points > 0 }.sortedByDescending { it.points }
         return PriorityResult(score, labelFor(score), modelScore, e.proba, sorted)
     }

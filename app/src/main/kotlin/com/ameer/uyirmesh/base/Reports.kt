@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.ameer.uyirmesh.Graph
+import com.ameer.uyirmesh.core.SecureZip
 import com.ameer.uyirmesh.data.CaseItem
 import com.ameer.uyirmesh.data.CaseStatus
 import java.io.File
@@ -29,6 +30,7 @@ object Reports {
             "case_id", "received", "priority", "score", "status", "kind", "people", "children", "elderly", "disabled",
             "pregnant", "injured", "needs", "name", "phone", "blood", "medical", "battery", "lat", "lon", "hops",
             "team", "rescuer", "eta_min", "assigned", "rescued", "times_sent", "duplicate_of", "drill", "note", "reasons",
+            "animals", "silent", "reported_for", "checks", "outcome", "handled_by",
         )
         val sb = StringBuilder(header.joinToString(",")).append('\n')
         for (c in Graph.store.cases.value.sortedBy { it.firstAt }) {
@@ -39,6 +41,8 @@ object Reports {
                     p.pregnant, p.injured, p.needs.joinToString(" "), p.name, p.phone, p.blood, p.medical, c.battery,
                     c.lat ?: "", c.lon ?: "", c.hops, c.team, c.rescuerName, c.etaMin, t(c.assignedAt), t(c.rescuedAt),
                     c.repeats + 1, c.duplicateOf, c.drill, p.note, c.reasons.joinToString("; ") { "${it.label} +${it.points}" },
+                    p.animals, p.silent, if (p.forOther) listOf(p.otherName, p.otherPhone).filter { it.isNotBlank() }.joinToString(" ") else "",
+                    c.flags.joinToString(" "), c.outcome, c.handledBy,
                 ).joinToString(",") { csvCell(it) },
             ).append('\n')
         }
@@ -52,6 +56,38 @@ object Reports {
         Graph.note("csv", e)
         null
     }
+
+    /**
+     * The cases (CSV) and the report (PDF) in a password-protected ZIP (AES-256), so a lost or forwarded file does
+     * not expose victims' names, phone numbers and positions.
+     */
+    fun writeSecureZip(ctx: Context, password: String): File? = try {
+        val pdf = writePdf(ctx)
+        val now = System.currentTimeMillis()
+        val entries = buildList {
+            add(SecureZip.Entry("uyirmesh_cases.csv", csv().toByteArray(Charsets.UTF_8), now))
+            if (pdf != null) add(SecureZip.Entry("uyirmesh_report.pdf", pdf.readBytes(), now))
+            add(SecureZip.Entry("README.txt", readme(now).toByteArray(Charsets.UTF_8), now))
+        }
+        pdf?.delete()
+        val dir = File(ctx.cacheDir, "share").apply { mkdirs() }
+        File(dir, "uyirmesh_cases_$now.zip").apply { writeBytes(SecureZip.write(entries, password)) }
+    } catch (e: Exception) {
+        Graph.note("secure zip", e)
+        null
+    }
+
+    private fun readme(now: Long): String = """
+        UyirMesh case export
+        Base: ${Graph.prefs.now.baseName}
+        Made: ${t(now)}
+        Cases: ${Graph.store.cases.value.size}
+
+        uyirmesh_cases.csv  - one line per SOS (open it in a spreadsheet)
+        uyirmesh_report.pdf - summary report
+
+        This file contains personal data of people in danger. Keep it private and delete it when it is no longer needed.
+    """.trimIndent()
 
     /** A4 report: summary numbers followed by one line per case, most urgent first. */
     fun writePdf(ctx: Context): File? = try {

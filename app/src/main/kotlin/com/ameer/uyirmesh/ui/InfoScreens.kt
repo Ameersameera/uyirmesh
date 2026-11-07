@@ -213,6 +213,7 @@ fun NetworkScreen(nav: Nav) {
                 KeyValue("TTL", "${s.ttl} ${tr("hops")}")
                 if (stats.lastError.isNotBlank()) KeyValue(tr("last_error"), stats.lastError, Palette.Red)
             }
+            NetworkHealthCard()
             ButtonRow {
                 val ctx = LocalContext.current
                 TonalButton(if (stats.running) tr("restart_mesh") else tr("start_mesh"), Ic.Refresh, Modifier.weight(1f)) {
@@ -222,6 +223,7 @@ fun NetworkScreen(nav: Nav) {
                 }
                 TonalButton(tr("send_heartbeat"), Ic.NetworkCheck, Modifier.weight(1f)) { Graph.mesh.sendHeartbeat() }
             }
+            MenuTile(Ic.Tower, tr("relay_mode"), tr("relay_mode_sub"), Palette.Teal) { nav.go("relay") }
             SectionTitle(tr("nearby_phones"))
             if (peers.isEmpty()) Text(tr("no_peers_hint"), style = MaterialTheme.typography.bodySmall)
             var blockTick by remember { mutableIntStateOf(0) }
@@ -296,6 +298,7 @@ private fun counterName(k: String): String = when (k) {
     "forgedDrops" -> tr("c_forged")
     "ttlStops" -> tr("c_ttl")
     "sendFailures" -> tr("c_failures")
+    "powerSkips" -> tr("c_power")
     else -> k
 }
 
@@ -534,6 +537,7 @@ fun SettingsScreen(nav: Nav) {
             Text(tr("other_triggers"), style = MaterialTheme.typography.bodySmall)
             SectionTitle(tr("battery"))
             SwitchRow(tr("battery_saver"), tr("battery_saver_sub"), s.batterySaver) { v -> Graph.prefs.update { it.copy(batterySaver = v) } }
+            PowerAndDataSettings(nav)
             SectionTitle(tr("mesh"))
             Stepper(tr("ttl_hops"), s.ttl, 1, 10, Ic.Network) { v -> Graph.prefs.update { it.copy(ttl = v) } }
             Text(tr("ttl_sub"), style = MaterialTheme.typography.bodySmall)

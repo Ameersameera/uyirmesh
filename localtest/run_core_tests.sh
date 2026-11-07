@@ -12,7 +12,7 @@ javac -d "$OUT/junit" "$ROOT"/localtest/junit/org/junit/*.java
 javac -cp "$OUT/junit" -d "$OUT/runner" "$ROOT/localtest/Runner.java"
 CP="$OUT/core-tests.jar:$OUT/junit:$OUT/runner:$KLIB/kotlin-stdlib.jar:$ROOT/core/src/test/resources"
 cd "$ROOT"
-java -cp "$CP" Runner \
+java ${JAVA_OPTS:-} -cp "$CP" Runner \
   com.ameer.uyirmesh.core.JsonBytesTest \
   com.ameer.uyirmesh.core.PacketCryptoTest \
   com.ameer.uyirmesh.core.MeshEngineTest \
@@ -20,4 +20,5 @@ java -cp "$CP" Runner \
   com.ameer.uyirmesh.core.GeoPriorityPayloadTest \
   com.ameer.uyirmesh.core.TrackingTest \
   com.ameer.uyirmesh.core.VoiceFormTest \
-  com.ameer.uyirmesh.core.Version2Test 2>&1 | grep -v "^Picked up"
+  com.ameer.uyirmesh.core.Version2Test \
+  com.ameer.uyirmesh.core.Version2bTest 2>&1 | grep -v "^Picked up"

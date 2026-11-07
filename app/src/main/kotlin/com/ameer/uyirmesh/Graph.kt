@@ -7,6 +7,7 @@ import com.ameer.uyirmesh.base.BaseBrain
 import com.ameer.uyirmesh.base.BaseOps
 import com.ameer.uyirmesh.core.Revocations
 import com.ameer.uyirmesh.mesh.Gateway
+import com.ameer.uyirmesh.mesh.MeshHealth
 import com.ameer.uyirmesh.mesh.SafetyHub
 import com.ameer.uyirmesh.core.PinnedBaseKeys
 import com.ameer.uyirmesh.data.LogEntry
@@ -65,6 +66,8 @@ object Graph {
         private set
     lateinit var gateway: Gateway
         private set
+    lateinit var health: MeshHealth
+        private set
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
 
@@ -93,12 +96,25 @@ object Graph {
         base = BaseBrain(app)
         rescuer = Rescuer(app)
         router = Router()
+        health = MeshHealth(app)
         mesh = Mesh(app, prefs.now.deviceId)
         trigger = SosTrigger(app)
         ready = true
         base.start()
         rescuer.start()
         victim.start()
+        // Old data is deleted in the background when the user turned that on.
+        scope.launch {
+            kotlinx.coroutines.delay(60_000)
+            while (true) {
+                try {
+                    com.ameer.uyirmesh.data.Cleanup.run()
+                } catch (e: Exception) {
+                    note("cleanup", e)
+                }
+                kotlinx.coroutines.delay(6 * 3600_000L)
+            }
+        }
         // Settings that change what the mesh does (role, hops, drill, battery saver) apply at once,
         // even while the background service is stopped.
         scope.launch {

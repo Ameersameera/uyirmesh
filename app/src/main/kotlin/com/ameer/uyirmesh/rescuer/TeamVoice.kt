@@ -50,7 +50,13 @@ object TeamVoice {
             r.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
             r.setAudioChannels(1)
             r.setAudioSamplingRate(8000)
-            r.setAudioEncodingBitRate(12200)
+            r.setAudioEncodingBitRate(
+                try {
+                    Graph.health.mediaLevel().voiceBitrate
+                } catch (e: Exception) {
+                    12_200
+                },
+            )
             r.setMaxDuration(MAX_SECONDS * 1000)
             r.setOutputFile(f.absolutePath)
             r.setOnInfoListener { _, what, _ ->

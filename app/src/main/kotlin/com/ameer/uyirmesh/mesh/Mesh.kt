@@ -90,9 +90,16 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
         engine.teams = if (bundle != null) setOf(bundle.cert.team) else emptySet()
         outbox.ttl = s.ttl
         outbox.drill = s.drill
-        link.lowPower = s.batterySaver
+        applyPower()
         val blocked = blockedPeers()
         if (blocked != link.blocked) link.blocked = blocked
+    }
+
+    /** Battery saver (set by hand) or the automatic low-battery rules decide how much this phone relays and searches. */
+    private fun applyPower() {
+        val p = Graph.health.power.value
+        engine.relayMaxQos = p.relayMaxQos
+        link.lowPower = Graph.prefs.now.batterySaver || p.lowRadio
     }
 
     fun blockedPeers(): Set<String> =
@@ -119,6 +126,7 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
         loops = scope.launch {
             launch { tickLoop() }
             launch { heartbeatLoop() }
+            launch { powerLoop() }
         }
         Graph.log("MESH", "Mesh started (device ${engine.myId.take(6)})")
     }
@@ -165,6 +173,28 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
                 Graph.note("heartbeat", e)
             }
             delay(if (Graph.prefs.now.batterySaver) 180_000L else 60_000L)
+        }
+    }
+
+    private suspend fun powerLoop() {
+        while (true) {
+            try {
+                if (Graph.health.refreshPower()) {
+                    applyPower()
+                    val p = Graph.health.power.value
+                    Graph.log(
+                        "POWER",
+                        when (p.relayMaxQos) {
+                            3 -> "Battery ${p.battery}%: relaying everything again"
+                            2 -> "Battery ${p.battery}%: no longer relaying voice and photos for others"
+                            else -> "Battery ${p.battery}%: relaying only SOS, replies and alerts"
+                        },
+                    )
+                }
+            } catch (e: Exception) {
+                Graph.note("power", e)
+            }
+            delay(60_000)
         }
     }
 
@@ -227,6 +257,9 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
         }
     }
 
+    /** Rough crowd count: different phones heard in the last 30 minutes. */
+    fun phonesHeard(): Int = engine.phonesHeard(30 * 60_000L)
+
     private fun publishStats() {
         _stats.value = MeshStats(
             running = loops != null,
@@ -253,6 +286,7 @@ class Mesh(private val ctx: Context, myId: String) : NearbyLink.Listener {
             }
             if (r.forwarded) kick = true
             val p = r.packet
+            if (r.drop == null && p != null && p.type in Authenticity.BASE_ONLY) Graph.health.onBaseHeard(p)
             if (r.drop != null) {
                 logDrop(r.drop!!, p, fromDevice)
             } else if (p != null && r.consumed) {

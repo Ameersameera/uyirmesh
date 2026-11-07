@@ -4,6 +4,7 @@ import android.content.Context
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.AlertKind
 import com.ameer.uyirmesh.core.AlertPayload
+import com.ameer.uyirmesh.core.BeaconPayload
 import com.ameer.uyirmesh.core.CaseSync
 import com.ameer.uyirmesh.core.Destinations
 import com.ameer.uyirmesh.core.HazardPayload
@@ -31,6 +32,7 @@ import com.ameer.uyirmesh.util.Notifier
 class BaseOps(private val ctx: Context) {
     private val store get() = Graph.store
     private var lastRevokeBroadcast = 0L
+    private var lastBeacon = 0L
 
     private fun ttl() = maxOf(Graph.mesh.outbox.ttl, 8)
 
@@ -159,5 +161,20 @@ class BaseOps(private val ctx: Context) {
 
     fun periodic(now: Long = System.currentTimeMillis()) {
         if (now - lastRevokeBroadcast > 30 * 60_000L) broadcastRevocations()
+        if (now - lastBeacon > BEACON_EVERY_MS) sendBeacon()
+    }
+
+    /** "The base is here" for every phone: name, position and open cases, signed with the base key. */
+    fun sendBeacon(): Boolean {
+        val keys = Graph.base.keys() ?: return false
+        val pos = Graph.loc.lastLatLon
+        val b = BeaconPayload(Graph.prefs.now.baseName, pos?.lat, pos?.lon, store.cases.value.count { it.isOpen }, System.currentTimeMillis())
+        Graph.mesh.send(Graph.mesh.outbox.signedByBase(keys, PacketType.BASE_BEACON, b.toBytes(), Destinations.ALL, ttl()))
+        lastBeacon = System.currentTimeMillis()
+        return true
+    }
+
+    companion object {
+        const val BEACON_EVERY_MS = 10 * 60_000L
     }
 }

@@ -212,7 +212,9 @@ object PhotoUtil {
         cap.takePicture(opts, Executors.newSingleThreadExecutor(), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 val bytes = try {
-                    compress(f, 26_000)
+                    // Smaller photos when the link is weak, so they still get through.
+                    val level = com.ameer.uyirmesh.Graph.health.mediaLevel()
+                    compress(f, level.photoBytes)
                 } catch (e: Exception) {
                     null
                 }

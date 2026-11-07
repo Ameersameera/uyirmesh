@@ -392,6 +392,25 @@ class SmokeTest {
         waitText("Drinking water at the Govt school")
         back()
 
+        // The base beacon (two relays away) shows on the home screen how far the base is; a forged one is dropped.
+        val beaconMsg = BeaconPayload("Salem Control", 11.6643, 78.1460, 3, now())
+        inject(baseOut.signedByBase(TestBase.keys, PacketType.BASE_BEACON, beaconMsg.toBytes(), Destinations.ALL).relayCopy(1).relayCopy(2))
+        waitUntil("base beacon") { Graph.health.base.value?.name == "Salem Control" }
+        assertEquals(2, Graph.health.base.value!!.hops)
+        waitText("Salem Control")
+        val forgedBeacons = Graph.mesh.engine.metrics.forgedDrops
+        inject(Outbox(Ids.newDeviceId(), TestBase.pinned).plain(PacketType.BASE_BEACON, BeaconPayload("Fake base").toBytes(), Destinations.ALL))
+        waitUntil("fake beacon dropped") { Graph.mesh.engine.metrics.forgedDrops > forgedBeacons }
+        assertEquals("Salem Control", Graph.health.base.value!!.name)
+
+        // Relay mode for an old phone: dark screen, relays everything; leaving the screen ends it.
+        go("relay")
+        waitText(en("relay_running"))
+        waitUntil("relay mode on") { Graph.prefs.now.relayMode }
+        shot("06b_relay_mode")
+        tap(en("relay_stop"))
+        waitUntil("relay mode off") { !Graph.prefs.now.relayMode }
+
         // Group chat: a message from another phone arrives, and our own message is sent.
         inject(Outbox(Ids.newDeviceId(), TestBase.pinned).plain(PacketType.CHAT, ChatPayload("Meena", "Is anyone near the bridge?", now()).toBytes(), Destinations.ALL))
         go("chat")
@@ -466,6 +485,8 @@ class SmokeTest {
         assertTrue("AI score ${c.score}", c.score > 0)
         assertTrue(c.label in listOf("Critical", "High", "Medium", "Low"))
         assertTrue(c.reasons.isNotEmpty())
+        assertTrue("danger words in the note count", c.reasons.any { it.label == "Note: water rising" })
+        assertTrue("no warning flags for a normal SOS", c.flags.isEmpty())
         assertEquals(4, c.proba.size)
         Log.i(TAG, "AI priority: ${c.label} ${c.score} (model ${c.modelScore}) ${c.reasons.map { "${it.label}+${it.points}" }}")
         // The base answers the victim with a signed reply.
@@ -632,6 +653,22 @@ class SmokeTest {
         val pdf = Reports.writePdf(Graph.app)
         assertNotNull(pdf)
         assertTrue(pdf!!.length() > 1_000)
+        // Password-protected export: a ZIP whose content (names, phone numbers) is not readable without the password.
+        val zip = Reports.writeSecureZip(Graph.app, "rescue-2026")!!.readBytes()
+        assertEquals('P'.code.toByte(), zip[0])
+        assertEquals('K'.code.toByte(), zip[1])
+        assertFalse(String(zip, Charsets.ISO_8859_1).contains("Ravi"))
+
+        // The base beacon is signed with the base key and goes to every phone.
+        assertTrue(Graph.baseOps.sendBeacon())
+        var beacon: Packet? = null
+        Graph.mesh.engine.forgetWhere { p ->
+            if (p.type == PacketType.BASE_BEACON && p.src == Graph.prefs.now.deviceId) beacon = p
+            false
+        }
+        assertNotNull(beacon)
+        assertTrue(Authenticity.check(TestBase.pinned, beacon!!, now()))
+        assertEquals(Graph.prefs.now.baseName, BeaconPayload.fromBytes(beacon!!.payload).baseName)
 
         // The victim cancels: a wrong cancel code is refused, the right one closes the case.
         inject(victimOut.sealedRescue(PacketType.SOS_CANCEL, SosCancel(sos.caseId, "wrong-code", now()).toBytes()), relay)
@@ -751,6 +788,9 @@ class SmokeTest {
         assertEquals("Priya", Authenticity.rescuerSigner(TestBase.pinned, update, now())?.name)
         assertEquals(100.0, AckPayload.fromBytes(update.payload).distanceM.toDouble(), 5.0)
         tap(en("rescued"))
+        // Version 2 asks how the rescue went before marking it done.
+        waitText(en("rescue_outcome"))
+        tap(en("mark_rescued"))
         waitUntil("rescued") { taskOf(baseTask.caseId)?.state == TaskState.RESCUED }
         back()
 
