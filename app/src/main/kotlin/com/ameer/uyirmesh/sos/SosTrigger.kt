@@ -28,21 +28,29 @@ class SosTrigger(private val ctx: Context) {
     private val _state = MutableStateFlow(Countdown())
     val state: StateFlow<Countdown> = _state
 
-    /** Starts the countdown. Returns false when one is already running or an SOS was sent seconds ago. */
+    private var pendingForm: SosForm? = null
+
+    /**
+     * Starts the countdown. Returns false when one is already running or an SOS was sent seconds ago.
+     * [form] replaces the last-used form (picture SOS, fall, missed check-in); a silent form counts down with
+     * vibration only, no beeps.
+     */
     @Synchronized
-    fun start(trigger: String, seconds: Int = 5): Boolean {
+    fun start(trigger: String, seconds: Int = 5, form: SosForm? = null): Boolean {
         if (_state.value.active) return false
         if (Graph.victim.recentlySent()) {
             Graph.log("SOS", "Trigger ${trigger.lowercase()} ignored: SOS was sent seconds ago")
             return false
         }
-        Graph.log("SOS", "SOS countdown started by ${trigger.lowercase()}")
+        Graph.log("SOS", "SOS countdown started by ${trigger.lowercase()} (${seconds} s)")
+        pendingForm = form
+        val silent = form?.silent == true
         job = scope.launch {
             for (s in seconds downTo 1) {
                 _state.value = Countdown(true, s, trigger)
                 Notifier.countdown(ctx, s, Victim.triggerName(trigger))
                 Graph.alarm.vibrateTick()
-                Graph.alarm.beep()
+                if (!silent) Graph.alarm.beep()
                 delay(1_000)
             }
             fire(trigger)
@@ -56,6 +64,7 @@ class SosTrigger(private val ctx: Context) {
         job?.cancel()
         job = null
         _state.value = Countdown()
+        pendingForm = null
         Notifier.cancel(ctx, Notifier.ID_COUNTDOWN)
         Graph.log("SOS", "SOS countdown cancelled")
     }
@@ -70,9 +79,11 @@ class SosTrigger(private val ctx: Context) {
 
     private fun fire(trigger: String) {
         _state.value = Countdown()
+        val form = pendingForm
+        pendingForm = null
         Notifier.cancel(ctx, Notifier.ID_COUNTDOWN)
         try {
-            Graph.victim.quickSos(trigger)
+            if (form != null) Graph.victim.sendSos(form, trigger) else Graph.victim.quickSos(trigger)
             if (trigger == Triggers.VOICE) VoiceNote.recordAndSend(ctx)
         } catch (e: Exception) {
             Graph.note("sos trigger", e)

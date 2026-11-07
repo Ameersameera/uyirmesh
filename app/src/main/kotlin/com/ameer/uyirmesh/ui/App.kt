@@ -104,6 +104,10 @@ private fun Route(nav: Nav, role: String) {
         "web" -> WebDashboardScreen(nav)
         "base_alert" -> BaseAlertScreen(nav)
         "team_chat" -> TeamChatScreen(nav)
+        "picture_sos" -> PictureSosScreen(nav)
+        "checkin" -> CheckInScreen(nav)
+        "cpr" -> CprScreen(nav)
+        "go_shelter" -> GoShelterScreen(nav, nav.arg())
         else -> PublicHome(nav)
     }
 }

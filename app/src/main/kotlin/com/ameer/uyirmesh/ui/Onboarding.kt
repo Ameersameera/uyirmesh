@@ -66,10 +66,7 @@ private fun ColumnScope.WelcomeStep(next: () -> Unit) {
     Spacer(Modifier.height(24.dp))
     InfoCard { Text(tr("welcome_body")) }
     SectionTitle(tr("language"))
-    ButtonRow {
-        TonalButton("English", modifier = Modifier.weight(1f), enabled = s.lang != "en") { Graph.prefs.update { it.copy(lang = "en") } }
-        TonalButton("தமிழ்", modifier = Modifier.weight(1f), enabled = s.lang != "ta") { Graph.prefs.update { it.copy(lang = "ta") } }
-    }
+    LanguageButtons(s.lang)
     Spacer(Modifier.height(24.dp))
     PrimaryButton(tr("next"), onClick = next)
 }

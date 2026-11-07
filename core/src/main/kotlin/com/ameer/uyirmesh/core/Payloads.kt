@@ -31,6 +31,15 @@ object Triggers {
     const val TILE = "TILE"
     const val SHORTCUT = "SHORTCUT"
     const val NOTIFICATION = "NOTIFICATION"
+
+    /** A hard fall or crash detected by the motion sensor (also "man down" for rescuers). */
+    const val FALL = "FALL"
+
+    /** The person did not tap "I'm OK" before their check-in timer ran out. */
+    const val CHECKIN = "CHECKIN"
+
+    /** One tap on the picture-only SOS screen. */
+    const val PICTURE = "PICTURE"
 }
 
 private fun Double?.r6(): Double? = this?.let { Math.round(it * 1e6) / 1e6 }
@@ -58,12 +67,21 @@ data class SosPayload(
     val trigger: String = Triggers.BUTTON,
     val cancelHash: String = "",
     val sentAt: Long = 0,
+    /** The victim must stay quiet (hiding, or a sleeping baby): rescuers should not call out or ring the phone. */
+    val silent: Boolean = false,
+    /** Sent on behalf of someone else (a neighbour without a phone, a person seen in danger). */
+    val forOther: Boolean = false,
+    val otherName: String = "",
+    val otherPhone: String = "",
+    /** Animals that also need rescue (cows, goats, dogs...). */
+    val animals: Int = 0,
 ) {
     fun toJson(): Map<String, Any?> = linkedMapOf(
         "c" to caseId, "k" to kind, "p" to people, "ch" to children, "el" to elderly, "di" to disabled,
         "pr" to pregnant, "in" to injured, "nd" to needs, "no" to note, "b" to battery,
         "la" to lat.r6(), "lo" to lon.r6(), "ac" to accuracy, "lt" to locTime,
         "n" to name, "ph" to phone, "bg" to blood, "md" to medical, "tr" to trigger, "cx" to cancelHash, "t" to sentAt,
+        "si" to silent, "fo" to forOther, "on" to otherName, "op" to otherPhone, "an" to animals,
     )
 
     fun toBytes(): ByteArray = Json.toBytes(toJson())
@@ -78,6 +96,8 @@ data class SosPayload(
             locTime = (m["lt"] as? Number)?.toLong(), name = m.str("n").take(60), phone = m.str("ph").take(30),
             blood = m.str("bg").take(8), medical = m.str("md").take(300), trigger = m.str("tr", Triggers.BUTTON),
             cancelHash = m.str("cx"), sentAt = m.long("t"),
+            silent = m.bool("si"), forOther = m.bool("fo"), otherName = m.str("on").take(60),
+            otherPhone = m.str("op").take(30), animals = m.int("an").coerceIn(0, 999),
         )
 
         fun fromBytes(b: ByteArray) = fromJson(Json.objectFromBytes(b))

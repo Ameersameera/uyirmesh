@@ -28,6 +28,12 @@ data class Settings(
     val webServer: Boolean = false,
     val familyPhones: String = "",
     val baseName: String = "Rescue Base",
+    /** Hard fall or crash starts a 30-second SOS countdown ("man down" for rescuers). */
+    val fallDetect: Boolean = false,
+    /** Read SOS replies aloud with the phone's text-to-speech. */
+    val speakUpdates: Boolean = true,
+    /** Home screen with only big pictures (children, elderly, people who cannot read). */
+    val simpleMode: Boolean = false,
 )
 
 class Prefs(context: Context) {
@@ -61,6 +67,9 @@ class Prefs(context: Context) {
             webServer = sp.getBoolean("webServer", false),
             familyPhones = sp.getString("familyPhones", "") ?: "",
             baseName = sp.getString("baseName", "Rescue Base") ?: "Rescue Base",
+            fallDetect = sp.getBoolean("fallDetect", false),
+            speakUpdates = sp.getBoolean("speakUpdates", true),
+            simpleMode = sp.getBoolean("simpleMode", false),
         )
     }
 
@@ -86,6 +95,9 @@ class Prefs(context: Context) {
             .putBoolean("webServer", s.webServer)
             .putString("familyPhones", s.familyPhones.take(200))
             .putString("baseName", s.baseName.take(40))
+            .putBoolean("fallDetect", s.fallDetect)
+            .putBoolean("speakUpdates", s.speakUpdates)
+            .putBoolean("simpleMode", s.simpleMode)
             .apply()
         _settings.value = s
     }

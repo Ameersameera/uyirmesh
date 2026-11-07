@@ -21,6 +21,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Bloodtype
+import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.FamilyRestroom
+import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.PersonalInjury
+import androidx.compose.material.icons.filled.CellTower
+import androidx.compose.material.icons.filled.HowToReg
+import androidx.compose.material.icons.filled.Backpack
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Accessible
@@ -203,6 +225,28 @@ object Ic {
     val Logout = Icons.Filled.ExitToApp
     val Arrow = Icons.Filled.KeyboardArrowRight
     val Time = Icons.Filled.AccessTime
+    val Pets = Icons.Filled.Pets
+    val Timer = Icons.Filled.Timer
+    val Explore = Icons.Filled.Explore
+    val Mute = Icons.Filled.VolumeOff
+    val Touch = Icons.Filled.TouchApp
+    val Speak = Icons.Filled.RecordVoiceOver
+    val Checklist = Icons.Filled.Checklist
+    val Game = Icons.Filled.SportsEsports
+    val Blood = Icons.Filled.Bloodtype
+    val Poll = Icons.Filled.Poll
+    val Sensor = Icons.Filled.Sensors
+    val Cloud = Icons.Filled.CloudUpload
+    val Block = Icons.Filled.Block
+    val Swap = Icons.Filled.SwapHoriz
+    val Family = Icons.Filled.FamilyRestroom
+    val Hazard = Icons.Filled.ReportProblem
+    val Injury = Icons.Filled.PersonalInjury
+    val Tower = Icons.Filled.CellTower
+    val HowToReg = Icons.Filled.HowToReg
+    val Backpack = Icons.Filled.Backpack
+    val Speed = Icons.Filled.Speed
+    val Walkie = Icons.Filled.SettingsVoice
 }
 
 @Composable

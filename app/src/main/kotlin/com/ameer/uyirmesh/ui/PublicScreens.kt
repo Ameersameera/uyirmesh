@@ -99,6 +99,8 @@ fun PublicHome(nav: Nav) {
     val active = mySos.lastOrNull { it.active }
     val now = System.currentTimeMillis()
     val liveAlerts = alerts.filter { it.isValid(now) && it.kind != "SHELTER" && now - it.receivedAt < 24 * 3600_000L }
+    val settings by Graph.prefs.settings.collectAsStateWithLifecycle()
+    val checkIn by com.ameer.uyirmesh.sos.CheckIn.state.collectAsStateWithLifecycle()
     Scaffold(topBar = {
         ScreenBar("UyirMesh", null) {
             IconButton(onClick = { nav.go("settings") }) { Icon(Ic.Settings, tr("settings")) }
@@ -122,8 +124,22 @@ fun PublicHome(nav: Nav) {
                     Text(a.message, maxLines = 2)
                 }
             }
+            if (checkIn != null) {
+                InfoCard(color = Palette.Teal.copy(alpha = 0.13f), onClick = { nav.go("checkin") }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Ic.Timer, null, tint = Palette.Teal)
+                        Spacer(Modifier.width(10.dp))
+                        Text(tr("checkin_due").replace("{t}", com.ameer.uyirmesh.sos.CheckIn.timeOf(checkIn!!.deadline)), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        TonalButton(tr("checkin_ok")) { com.ameer.uyirmesh.sos.CheckIn.ok(Graph.app) }
+                    }
+                }
+            }
             if (active != null) {
                 ActiveSosCard(active) { nav.go("sos_status") }
+            } else if (settings.simpleMode) {
+                Spacer(Modifier.height(8.dp))
+                Text(tr("picture_sos_hint"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 8.dp))
+                PictureSosGrid { }
             } else {
                 Spacer(Modifier.height(12.dp))
                 BigSosButton { nav.go("sos_form") }
@@ -140,6 +156,16 @@ fun PublicHome(nav: Nav) {
                 PrimaryButton(tr("im_safe"), Ic.CheckCircle, Modifier.weight(1f), color = Palette.Green) { nav.go("safe") }
                 PrimaryButton(tr("find_me"), Ic.Siren, Modifier.weight(1f), color = Palette.Orange) { nav.go("findme") }
             }
+            if (settings.simpleMode) {
+                Spacer(Modifier.height(12.dp))
+                SecondaryButton(tr("full_app"), Ic.Home) { Graph.prefs.update { it.copy(simpleMode = false) } }
+                Spacer(Modifier.height(24.dp))
+                return@Column
+            }
+            NearestShelterCard(nav)
+            SectionTitle(tr("safety_tools"))
+            MenuTile(Ic.Touch, tr("picture_sos"), tr("picture_sos_sub"), Palette.Red) { nav.go("picture_sos") }
+            MenuTile(Ic.Timer, tr("checkin"), tr("checkin_sub"), Palette.Teal) { nav.go("checkin") }
             SectionTitle(tr("help_and_info"))
             MenuTile(Ic.Alert, tr("alerts"), tr("alerts_sub"), Palette.Orange, badge = liveAlerts.size) { nav.go("alerts") }
             MenuTile(Ic.Chat, tr("group_chat"), tr("group_chat_sub"), Palette.Blue) { nav.go("chat") }
@@ -239,10 +265,28 @@ fun SosFormScreen(nav: Nav) {
     var injured by remember { mutableStateOf(start.injured) }
     var needs by remember { mutableStateOf(start.needs.toSet()) }
     var note by remember { mutableStateOf("") }
+    var animals by remember { mutableIntStateOf(start.animals) }
+    var silent by remember { mutableStateOf(false) }
+    var forOther by remember { mutableStateOf(false) }
+    var otherName by remember { mutableStateOf("") }
+    var otherPhone by remember { mutableStateOf("") }
     var voiceAfter by remember { mutableStateOf(Perms.hasMic(ctx)) }
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { voiceAfter = it }
     Scaffold(topBar = { ScreenBar(tr("send_sos"), { nav.back() }) }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).imePadding()) {
+            VoiceFillCard { text, r ->
+                r.kind?.let { kind = it }
+                r.people?.let { people = it }
+                r.children?.let { children = it }
+                r.elderly?.let { elderly = it }
+                r.disabled?.let { disabled = it }
+                r.pregnant?.let { pregnant = it }
+                r.injured?.let { injured = it }
+                r.animals?.let { animals = it }
+                if (r.needs.isNotEmpty()) needs = needs + r.needs
+                if (people < children + elderly) people = (children + elderly).coerceAtMost(200)
+                if (note.isBlank()) note = text.take(300)
+            }
             SectionTitle(tr("what_happened"))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (k in EmergencyKind.ALL) {
@@ -256,6 +300,7 @@ fun SosFormScreen(nav: Nav) {
             Stepper(tr("disabled"), disabled, 0, 99, Ic.Accessible) { disabled = it }
             Stepper(tr("pregnant"), pregnant, 0, 99, Ic.Pregnant) { pregnant = it }
             SwitchRow(tr("someone_injured"), tr("someone_injured_sub"), injured) { injured = it }
+            Stepper(tr("animals"), animals, 0, 99, Ic.Pets) { animals = it }
             SectionTitle(tr("we_need"))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (n in Needs.ALL) {
@@ -271,13 +316,22 @@ fun SosFormScreen(nav: Nav) {
                 value = note, onValueChange = { note = it.take(300) }, label = { Text(tr("note_optional")) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), minLines = 2,
             )
+            SwitchRow(tr("silent_sos"), tr("silent_sos_sub"), silent) { silent = it }
+            SwitchRow(tr("for_someone_else"), tr("for_someone_else_sub"), forOther) { forOther = it }
+            if (forOther) {
+                Field(tr("their_name"), otherName, { otherName = it.take(60) })
+                Field(tr("their_phone"), otherPhone, { otherPhone = it.take(30) }, number = true)
+            }
             SwitchRow(tr("voice_after"), tr("voice_after_sub"), voiceAfter) { on ->
                 if (on && !Perms.hasMic(ctx)) micLauncher.launch(Perms.MIC) else voiceAfter = on
             }
             Text(tr("sos_privacy"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             PrimaryButton(tr("send_sos_now"), Ic.Send, modifier = Modifier.height(64.dp)) {
-                val form = SosForm(kind, people, children, elderly, disabled, pregnant, injured, needs.toList(), note.trim())
+                val form = SosForm(
+                    kind, people, children, elderly, disabled, pregnant, injured, needs.toList(), note.trim(),
+                    silent = silent, forOther = forOther, otherName = otherName.trim(), otherPhone = otherPhone.trim(), animals = animals,
+                )
                 Graph.victim.sendSos(form, Triggers.BUTTON)
                 if (voiceAfter) VoiceNote.recordAndSend(ctx)
                 nav.replace("home")

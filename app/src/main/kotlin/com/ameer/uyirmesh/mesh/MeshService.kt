@@ -13,6 +13,8 @@ import androidx.lifecycle.lifecycleScope
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.Roles
 import com.ameer.uyirmesh.core.Triggers
+import com.ameer.uyirmesh.core.EmergencyKind
+import com.ameer.uyirmesh.sos.FallDetector
 import com.ameer.uyirmesh.sos.ShakeDetector
 import com.ameer.uyirmesh.sos.VoiceTrigger
 import com.ameer.uyirmesh.ui.L
@@ -30,6 +32,7 @@ import kotlinx.coroutines.launch
 class MeshService : LifecycleService() {
     private var voice: VoiceTrigger? = null
     private var shake: ShakeDetector? = null
+    private var fall: FallDetector? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentTypes = -1
     private var foregroundStart = false
@@ -145,9 +148,33 @@ class MeshService : LifecycleService() {
             shake?.stop()
             shake = null
         }
-        // Keep the CPU awake for shake detection with the screen off (voice listening keeps it awake by itself).
-        setWakeLock(wantShake || s.role == Roles.BASE)
+        // Fall / crash detection ("man down" for rescuers).
+        val wantFall = s.fallDetect && s.role != Roles.BASE
+        if (wantFall) {
+            if (fall == null) fall = FallDetector(this) { onFall() }
+            fall?.start()
+        } else {
+            fall?.stop()
+            fall = null
+        }
+        // Keep the CPU awake for shake and fall detection with the screen off (voice listening keeps it awake by itself).
+        setWakeLock(wantShake || wantFall || s.role == Roles.BASE)
         Graph.base.webServerCheck()
+    }
+
+    /** A hard fall: 30-second countdown (easy to cancel if the phone was only dropped), then an SOS. */
+    private fun onFall() {
+        val s = Graph.prefs.now
+        val rescuer = if (s.role == Roles.RESCUER) Graph.rescuer.bundle() else null
+        val note = if (rescuer != null) {
+            L.t("man_down_note").replace("{n}", rescuer.cert.name).replace("{t}", rescuer.cert.team)
+        } else {
+            L.t("fall_note")
+        }
+        val last = Graph.victim.lastForm()
+        val form = last.copy(kind = EmergencyKind.MEDICAL, injured = true, note = note, people = if (rescuer != null) 1 else last.people)
+        Graph.log("SOS", if (rescuer != null) "Man-down alarm (fall detected)" else "Fall detected")
+        Graph.trigger.start(Triggers.FALL, seconds = 30, form = form)
     }
 
     @SuppressLint("WakelockTimeout")
@@ -190,6 +217,8 @@ class MeshService : LifecycleService() {
         voice = null
         shake?.stop()
         shake = null
+        fall?.stop()
+        fall = null
         setWakeLock(false)
         Graph.base.stopWebServer()
         Graph.mesh.stop()

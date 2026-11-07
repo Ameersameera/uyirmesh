@@ -6,6 +6,7 @@ import android.content.Intent
 import com.ameer.uyirmesh.Graph
 import com.ameer.uyirmesh.core.Triggers
 import com.ameer.uyirmesh.mesh.MeshService
+import com.ameer.uyirmesh.sos.CheckIn
 import com.ameer.uyirmesh.ui.L
 
 /** Buttons inside notifications (they also work on the lock screen). */
@@ -17,6 +18,7 @@ class ActionReceiver : BroadcastReceiver() {
             ACTION_CANCEL_COUNTDOWN -> Graph.trigger.cancel()
             ACTION_SEND_NOW -> Graph.trigger.sendNow()
             ACTION_STOP_SIREN -> Graph.alarm.stopAll()
+            ACTION_CHECKIN_OK -> CheckIn.ok(context)
             ACTION_SAFE -> {
                 MeshService.ensureRunning(context)
                 Graph.public.sendSafe(L.t("safe_default_message"), "")
@@ -30,5 +32,6 @@ class ActionReceiver : BroadcastReceiver() {
         const val ACTION_SEND_NOW = "com.ameer.uyirmesh.notif.SEND_NOW"
         const val ACTION_STOP_SIREN = "com.ameer.uyirmesh.notif.STOP_SIREN"
         const val ACTION_SAFE = "com.ameer.uyirmesh.notif.SAFE"
+        const val ACTION_CHECKIN_OK = "com.ameer.uyirmesh.notif.CHECKIN_OK"
     }
 }

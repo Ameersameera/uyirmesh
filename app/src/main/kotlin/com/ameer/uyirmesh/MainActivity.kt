@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
             "alerts" -> nav.go("alerts")
             "chat" -> nav.go("chat")
             "missing" -> nav.go("missing")
+            "checkin" -> nav.go("checkin")
             "base", "rescuer" -> nav.replace("home")
         }
         i.removeExtra(EXTRA_OPEN)

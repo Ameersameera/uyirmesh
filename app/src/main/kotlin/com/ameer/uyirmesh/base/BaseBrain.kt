@@ -665,7 +665,10 @@ class BaseBrain(private val ctx: Context) {
         }
         parts.add("${p.people} people" + if (people.isNotEmpty()) " (${people.joinToString()})" else "")
         if (p.injured) parts.add("injured")
+        if (p.animals > 0) parts.add("${p.animals} animals")
         if (p.needs.isNotEmpty()) parts.add("needs " + p.needs.joinToString { it.lowercase().replace('_', ' ') })
+        if (p.silent) parts.add("SILENT: approach quietly")
+        if (p.forOther) parts.add("reported for " + p.otherName.ifBlank { "someone else" } + if (p.otherPhone.isNotBlank()) " (${p.otherPhone})" else "")
         if (c.battery in 0..100) parts.add("battery ${c.battery}%")
         if (p.note.isNotBlank()) parts.add("\"${p.note.take(80)}\"")
         return parts.joinToString(" · ")

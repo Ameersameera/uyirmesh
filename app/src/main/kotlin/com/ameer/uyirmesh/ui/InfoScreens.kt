@@ -83,6 +83,7 @@ fun FirstAidScreen(nav: Nav) {
                     TonalButton(tr("call_108"), Ic.Call, Modifier.weight(1f)) { dial(ctx, "108") }
                     TonalButton(tr("call_112"), Ic.Call, Modifier.weight(1f)) { dial(ctx, "112") }
                 }
+                MenuTile(Ic.Heart, tr("cpr_helper"), tr("cpr_helper_sub"), Palette.Red) { nav.go("cpr") }
             }
             items(topics.size) { i ->
                 val t = topics[i]
@@ -492,6 +493,21 @@ fun runCryptoTest(): String = try {
 
 /* ---------------- settings ---------------- */
 
+/** Language choice. Hindi, Telugu, Malayalam and Kannada cover the SOS screens; other screens stay in English. */
+val LANGUAGES = listOf("en" to "English", "ta" to "தமிழ்", "hi" to "हिन्दी", "te" to "తెలుగు", "ml" to "മലയാളം", "kn" to "ಕನ್ನಡ")
+
+@Composable
+fun LanguageButtons(current: String) {
+    for (row in LANGUAGES.chunked(3)) {
+        ButtonRow {
+            for ((code, name) in row) {
+                TonalButton(name, modifier = Modifier.weight(1f), enabled = current != code) { Graph.prefs.update { it.copy(lang = code) } }
+            }
+        }
+    }
+    if (current != "en" && current != "ta") Text(tr("lang_partial"), style = MaterialTheme.typography.bodySmall)
+}
+
 @Composable
 fun SettingsScreen(nav: Nav) {
     val s by Graph.prefs.settings.collectAsStateWithLifecycle()
@@ -500,10 +516,7 @@ fun SettingsScreen(nav: Nav) {
     Scaffold(topBar = { ScreenBar(tr("settings"), { nav.back() }) }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             SectionTitle(tr("language"))
-            ButtonRow {
-                TonalButton("English", modifier = Modifier.weight(1f), enabled = s.lang != "en") { Graph.prefs.update { it.copy(lang = "en") } }
-                TonalButton("தமிழ்", modifier = Modifier.weight(1f), enabled = s.lang != "ta") { Graph.prefs.update { it.copy(lang = "ta") } }
-            }
+            LanguageButtons(s.lang)
             SectionTitle(tr("display"))
             SwitchRow(tr("large_text"), "", s.largeText) { v -> Graph.prefs.update { it.copy(largeText = v) } }
             ButtonRow {
@@ -514,6 +527,10 @@ fun SettingsScreen(nav: Nav) {
             SectionTitle(tr("hands_free_sos"))
             SwitchRow(tr("voice_sos"), tr("voice_sos_sub"), s.voice) { v -> Graph.prefs.update { it.copy(voice = v) } }
             SwitchRow(tr("shake_sos"), tr("shake_sos_sub"), s.shake) { v -> Graph.prefs.update { it.copy(shake = v) } }
+            SwitchRow(tr("fall_detect"), tr("fall_detect_sub"), s.fallDetect) { v -> Graph.prefs.update { it.copy(fallDetect = v) } }
+            SwitchRow(tr("speak_updates"), tr("speak_updates_sub"), s.speakUpdates) { v -> Graph.prefs.update { it.copy(speakUpdates = v) } }
+            SwitchRow(tr("simple_mode"), tr("simple_mode_sub"), s.simpleMode) { v -> Graph.prefs.update { it.copy(simpleMode = v) } }
+            Text(tr("vibration_codes") + ": " + tr("vibration_codes_body"), style = MaterialTheme.typography.bodySmall)
             Text(tr("other_triggers"), style = MaterialTheme.typography.bodySmall)
             SectionTitle(tr("battery"))
             SwitchRow(tr("battery_saver"), tr("battery_saver_sub"), s.batterySaver) { v -> Graph.prefs.update { it.copy(batterySaver = v) } }

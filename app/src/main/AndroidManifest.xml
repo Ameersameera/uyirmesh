@@ -68,6 +68,13 @@
         android:name="android.hardware.sensor.accelerometer"
         android:required="false" />
 
+    <!-- Reading SOS replies aloud (text-to-speech engines must be visible on Android 11+). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".UyirApp"
         android:allowBackup="false"

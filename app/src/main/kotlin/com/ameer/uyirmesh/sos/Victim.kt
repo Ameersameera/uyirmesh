@@ -42,6 +42,12 @@ data class SosForm(
     val injured: Boolean = false,
     val needs: List<String> = emptyList(),
     val note: String = "",
+    /** Vibration-only countdown, no reading aloud, and rescuers are told to approach quietly. */
+    val silent: Boolean = false,
+    val forOther: Boolean = false,
+    val otherName: String = "",
+    val otherPhone: String = "",
+    val animals: Int = 0,
 )
 
 /**
@@ -53,8 +59,11 @@ class Victim(private val ctx: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CrashGuard)
     private val store get() = Graph.store
     private var lastSosAt = 0L
+    val speaker = Speaker(ctx)
+    private var spokenBucket = HashMap<String, Int>()
 
     fun start() {
+        CheckIn.load()
         // A clearly better position (e.g. the first GPS fix after a rough network one) goes out at once.
         scope.launch {
             Graph.loc.lastFlow.collect {
@@ -74,7 +83,12 @@ class Victim(private val ctx: Context) {
                 } catch (e: Exception) {
                     Graph.note("sos follow-up", e)
                 }
-                delay(30_000)
+                try {
+                    CheckIn.tick(ctx)
+                } catch (e: Exception) {
+                    Graph.note("check-in", e)
+                }
+                delay(if (CheckIn.state.value != null) 15_000 else 30_000)
             }
         }
     }
@@ -84,7 +98,7 @@ class Victim(private val ctx: Context) {
     /** Default form for hands-free SOS: the last kind and group size the person used. */
     fun lastForm(): SosForm {
         val last = store.mySos.value.lastOrNull()?.payload ?: return SosForm()
-        return SosForm(last.kind, last.people, last.children, last.elderly, last.disabled, last.pregnant, last.injured, last.needs)
+        return SosForm(last.kind, last.people, last.children, last.elderly, last.disabled, last.pregnant, last.injured, last.needs, animals = last.animals)
     }
 
     /** Sends an SOS. If one is already open, it is sent again with the new details (same case). */
@@ -122,6 +136,11 @@ class Victim(private val ctx: Context) {
             trigger = trigger,
             cancelHash = Crypto.sha256Hex(secret),
             sentAt = now,
+            silent = form.silent,
+            forOther = form.forOther,
+            otherName = form.otherName.take(60),
+            otherPhone = form.otherPhone.take(30),
+            animals = form.animals.coerceIn(0, 999),
         )
         val packet = Graph.mesh.outbox.sealedRescue(PacketType.SOS, payload.toBytes())
         Graph.mesh.send(packet)
@@ -132,7 +151,7 @@ class Victim(private val ctx: Context) {
         }
         store.mySos.upsert({ it.caseId }, sos)
         store.flush()
-        Graph.log("SOS", "SOS ${if (existing != null) "re-sent" else "sent"} (${payload.kind}, ${payload.people} people, trigger $trigger, packet ${packet.shortId}, ${if (loc != null) "with GPS" else "no GPS yet"})")
+        Graph.log("SOS", "SOS ${if (existing != null) "re-sent" else "sent"} (${payload.kind}, ${payload.people} people, trigger $trigger, packet ${packet.shortId}, ${if (loc != null) "with GPS" else "no GPS yet"}${if (payload.silent) ", silent" else ""}${if (payload.forOther) ", for someone else" else ""})")
         Graph.alarm.vibrateSent()
         Notifier.sosStatus(ctx, L.t("sos_sent_title"), L.t("sos_sent_text"), loud = false)
         Graph.loc.startTracking("sos", 60_000)
@@ -273,6 +292,19 @@ class Victim(private val ctx: Context) {
         val text = L.t("help_notify").replace("{w}", verifiedBy).replace("{d}", Geo.formatDistance(ack.distanceM.toDouble()))
             .replace("{e}", etaText(ack.etaMin))
         Notifier.sosStatus(ctx, L.t("help_coming"), text, loud = false)
+        val bucket = when {
+            ack.distanceM < 150 -> 3
+            ack.distanceM < 500 -> 2
+            ack.distanceM < 1000 -> 1
+            else -> 0
+        }
+        if (bucket != spokenBucket[sos.caseId]) {
+            spokenBucket[sos.caseId] = bucket
+            if (bucket == 3) Graph.alarm.vibrateCode(Alarm.NEAR) else Graph.alarm.vibrateCode(AckStatus.ON_THE_WAY)
+            if (!sos.payload.silent) {
+                if (bucket == 3) speaker.say("say_near") else speaker.say("say_distance", "w" to verifiedBy, "d" to Geo.formatDistance(ack.distanceM.toDouble()))
+            }
+        }
         Graph.log("SOS", "Rescuer $verifiedBy is ${ack.distanceM} m away (verified signature)")
     }
 
@@ -327,7 +359,15 @@ class Victim(private val ctx: Context) {
             else -> ack.message
         } + if (ack.message.isNotBlank() && ack.status != AckStatus.RECEIVED) "\n${ack.message}" else ""
         Notifier.sosStatus(ctx, L.t("reply_from").replace("{w}", who), text, loud = true)
-        Graph.alarm.vibrateReply()
+        Graph.alarm.vibrateCode(ack.status)
+        if (!updated.payload.silent) {
+            when (ack.status) {
+                AckStatus.RECEIVED -> speaker.say("say_received")
+                AckStatus.ASSIGNED -> speaker.say("say_assigned", "t" to ack.team.ifBlank { who })
+                AckStatus.ON_THE_WAY -> speaker.say("say_on_way", "e" to (if (ack.etaMin > 0) ack.etaMin.toString() else "?"))
+                AckStatus.RESCUED -> speaker.say("say_rescued")
+            }
+        }
         Graph.log("SOS", "Reply ${ack.status} from $who (verified signature)")
         if (!updated.active) {
             Graph.loc.stopTracking("sos")
@@ -346,6 +386,9 @@ class Victim(private val ctx: Context) {
             Triggers.TILE -> L.t("trigger_tile")
             Triggers.SHORTCUT -> L.t("trigger_shortcut")
             Triggers.NOTIFICATION -> L.t("trigger_notification")
+            Triggers.FALL -> L.t("trigger_fall")
+            Triggers.CHECKIN -> L.t("trigger_checkin")
+            Triggers.PICTURE -> L.t("trigger_picture")
             else -> L.t("trigger_button")
         }
     }

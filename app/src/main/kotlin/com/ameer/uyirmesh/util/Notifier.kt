@@ -30,6 +30,7 @@ object Notifier {
     const val ID_MSG = 4
     const val ID_TEAM = 5
     const val ID_FIND = 6
+    const val ID_CHECKIN = 7
     private const val ID_ALERT_BASE = 1000
     private const val ID_CASE_BASE = 3000
     private const val ID_TASK_BASE = 5000
@@ -161,6 +162,24 @@ object Notifier {
             .setAutoCancel(false)
             .build()
         post(ctx, ID_SOS_STATUS, n)
+    }
+
+    /** Check-in reminder with an "I'm OK" button (works on the lock screen). */
+    fun checkIn(ctx: Context, title: String, text: String) {
+        val n = NotificationCompat.Builder(ctx, CH_SOS)
+            .setSmallIcon(R.drawable.ic_sos)
+            .setColor(Color.rgb(255, 143, 0))
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(openApp(ctx, "checkin", 60))
+            .setAutoCancel(true)
+            .addAction(0, L.t("checkin_ok"), action(ctx, ActionReceiver.ACTION_CHECKIN_OK, 61))
+            .build()
+        post(ctx, ID_CHECKIN, n)
     }
 
     fun alert(ctx: Context, alertId: String, title: String, text: String, critical: Boolean) {

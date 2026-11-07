@@ -1,5 +1,6 @@
 package com.ameer.uyirmesh.sos
 
+import com.ameer.uyirmesh.core.AckStatus
 import com.ameer.uyirmesh.util.CrashGuard
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
@@ -207,6 +208,22 @@ class Alarm(private val ctx: Context) {
     fun vibrateSent() = vibrate(longArrayOf(0, 120, 80, 120))
     fun vibrateTick() = vibrate(longArrayOf(0, 180))
     fun vibrateReply() = vibrate(longArrayOf(0, 500, 200, 500, 200, 500))
+
+    /**
+     * Vibration codes, so a person who cannot look at the screen (or must stay silent) still knows what happened:
+     * one long = reached the base, two short = team assigned, three short = help on the way,
+     * long-short-long = the rescuer is very close, four short = rescued.
+     */
+    fun vibrateCode(status: String) = vibrate(
+        when (status) {
+            AckStatus.RECEIVED -> longArrayOf(0, 700)
+            AckStatus.ASSIGNED -> longArrayOf(0, 200, 150, 200)
+            AckStatus.ON_THE_WAY -> longArrayOf(0, 200, 150, 200, 150, 200)
+            AckStatus.RESCUED -> longArrayOf(0, 200, 150, 200, 150, 200, 150, 200)
+            NEAR -> longArrayOf(0, 600, 150, 200, 150, 600)
+            else -> longArrayOf(0, 500, 200, 500, 200, 500)
+        }
+    )
     fun vibrateSos() = vibrate(longArrayOf(0, 150, 100, 150, 100, 150, 300, 450, 100, 450, 100, 450, 300, 150, 100, 150, 100, 150))
 
     fun beep() {
@@ -219,5 +236,10 @@ class Alarm(private val ctx: Context) {
             }
         } catch (_: Exception) {
         }
+    }
+
+    companion object {
+        /** Vibration code for "the rescuer is within about 150 m". */
+        const val NEAR = "NEAR"
     }
 }

@@ -243,5 +243,53 @@ class VoiceTrigger(private val ctx: Context, private val onHelp: () -> Unit) {
         val lastHeard: StateFlow<String> = _lastHeard
 
         val modelLoaded: Boolean get() = model != null
+
+        /**
+         * Loads the speech model once (shared with the "help help" trigger) and gives it to [onReady] on the main
+         * thread, or null when the model is missing or cannot load. Used by speak-to-fill on the SOS form.
+         */
+        fun withModel(ctx: Context, onReady: (Model?) -> Unit) {
+            val main = Handler(Looper.getMainLooper())
+            model?.let { m ->
+                main.post { onReady(m) }
+                return
+            }
+            val hasModel = try {
+                ctx.assets.list("model")?.isNotEmpty() == true
+            } catch (e: Exception) {
+                false
+            }
+            if (!hasModel) {
+                main.post { onReady(null) }
+                return
+            }
+            val app = ctx.applicationContext
+            Thread({
+                var waited = 0
+                while (loading && model == null && waited < 60_000) {
+                    try {
+                        Thread.sleep(250)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                    waited += 250
+                }
+                var m = model
+                if (m == null) {
+                    try {
+                        loading = true
+                        LibVosk.setLogLevel(LogLevel.WARNINGS)
+                        val path = StorageService.sync(app, "model", "model")
+                        m = Model(path)
+                        model = m
+                    } catch (t: Throwable) {
+                        m = null
+                    } finally {
+                        loading = false
+                    }
+                }
+                main.post { onReady(m) }
+            }, "voice-model-form").start()
+        }
     }
 }

@@ -606,6 +606,11 @@ fun CaseScreen(nav: Nav, caseId: String) {
             }
             SectionTitle(tr("victim"))
             InfoCard {
+                if (p.silent) Text(tr("approach_quietly"), color = Palette.Red, fontWeight = FontWeight.Bold)
+                if (p.forOther) {
+                    KeyValue(tr("for_whom"), p.otherName.ifBlank { "-" } + if (p.otherPhone.isNotBlank()) " · ${p.otherPhone}" else "", Palette.Purple)
+                }
+                if (p.animals > 0) KeyValue(tr("animals"), p.animals.toString())
                 KeyValue(tr("name"), p.name.ifBlank { "-" })
                 KeyValue(tr("phone"), p.phone.ifBlank { "-" })
                 KeyValue(tr("blood_group"), p.blood.ifBlank { "-" })

@@ -1,17 +1,19 @@
 name: Build APK
 
-# Builds and tests UyirMesh on GitHub's runners (real Android SDK + internet). The signed APK is published as
-# the "v1.0" release only after the unit tests AND the on-device smoke test on an Android 14 emulator pass.
+# Builds and tests UyirMesh on GitHub's runners (real Android SDK + internet). The signed APK is published as a
+# release named after the app version (v<versionName>) only after the unit tests AND the on-device smoke test on an
+# Android 14 emulator pass. Builds from the v2-dev branch are published as a test pre-release (v<versionName>-dev);
+# older releases such as v1.0 are never touched.
 on:
   push:
-    branches: [ main ]
+    branches: [ main, v2-dev ]
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-apk
+  group: build-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -148,12 +150,19 @@ jobs:
         run: |
           cp dist/app-release.apk UyirMesh.apk
           ls -la UyirMesh.apk
-          gh release delete v1.0 --cleanup-tag --yes || true
-          gh release create v1.0 UyirMesh.apk \
-            --title "UyirMesh v1.0 (build ${{ github.run_number }})" \
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            TAG="v$VERSION"; EXTRA=""; TITLE="UyirMesh v$VERSION (build ${{ github.run_number }})"
+          else
+            TAG="v$VERSION-dev"; EXTRA="--prerelease"; TITLE="UyirMesh v$VERSION test build (build ${{ github.run_number }})"
+          fi
+          gh release delete "$TAG" --cleanup-tag --yes || true
+          gh release create "$TAG" UyirMesh.apk $EXTRA --target "${{ github.sha }}" \
+            --title "$TITLE" \
             --notes "Signed APK built by GitHub Actions from commit ${{ github.sha }}; passed the unit tests and the on-device smoke test on an Android 14 emulator. Android 8.0 or newer. Install it on every phone (allow installing from unknown sources)."
 
       - name: Push APK to apk-dist branch
+        if: github.ref == 'refs/heads/main'
         run: |
           cp dist/app-release.apk /tmp/UyirMesh.apk
           git config user.name "github-actions"
