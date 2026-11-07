@@ -159,7 +159,11 @@ jobs:
           gh release delete "$TAG" --cleanup-tag --yes || true
           gh release create "$TAG" UyirMesh.apk $EXTRA --target "${{ github.sha }}" \
             --title "$TITLE" \
-            --notes "Signed APK built by GitHub Actions from commit ${{ github.sha }}; passed the unit tests and the on-device smoke test on an Android 14 emulator. Android 8.0 or newer. Install it on every phone (allow installing from unknown sources)."
+            --notes "Signed APK built by GitHub Actions from commit ${{ github.sha }}; passed the unit tests and the on-device smoke test on an Android 14 emulator. Android 8.0 or newer. Install it on every phone (allow installing from unknown sources). What is new: see the README."
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            # The finished release replaces the test build of the same version.
+            gh release delete "v$VERSION-dev" --cleanup-tag --yes || true
+          fi
 
       - name: Push APK to apk-dist branch
         if: github.ref == 'refs/heads/main'

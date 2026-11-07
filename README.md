@@ -11,7 +11,18 @@ Bluetooth, BLE and Wi-Fi (Google Nearby Connections). An SOS hops from phone to 
 the rescue base. The base ranks every SOS with an on-phone Random Forest model, assigns rescue teams
 and sends signed replies and alerts back through the same mesh.
 
-Download the latest APK: **Releases → v1.0 → UyirMesh.apk** (Android 8.0 or newer).
+Download the latest APK: **Releases → v2.0 → UyirMesh.apk** (Android 8.0 or newer). Version 1.0 stays available
+under Releases → v1.0.
+
+## What is new in version 2.0
+
+| For | New |
+|---|---|
+| People in danger | fall / crash detection (30 s countdown), "check in or SOS" timer, picture SOS and simple mode for children and the elderly, fill the SOS form by voice (offline), silent SOS, SOS for someone else, animals count, replies read aloud and vibration codes, CPR beat helper, compass to the nearest shelter, SOS screens in Hindi, Telugu, Malayalam and Kannada (plus English and Tamil) |
+| Rescuers | man-down alarm, push-to-talk voice to the team, mark hazards (bridge down, live wire...) signed with the rescuer ID, rescue outcome report |
+| Rescue base | polls and roll calls, revoke lost rescuer IDs, hazard markers, several bases in step (case sync and hand-over), optimal "assign all" plan (Hungarian method), ETAs learned from finished rescues, danger words in the note raise the score, warning flags for possible fake SOS, better duplicate finding, password-protected (AES-256 ZIP) export, blood requests |
+| Mesh | base beacon (phones see "base 3 hops away, heard 2 min ago, 1.2 km"), battery-aware relaying, relay mode for old phones on a charger, smaller voice/photo on a weak link, internet relay (`server/gateway_server.py`) when any phone gets internet, crowd count |
+| Community | blood donor finder, missing-person matches, lost-child QR, be-ready checklist, practice game, Bluetooth water/rain sensor boxes (`hardware/`, not tested on real hardware), automatic deletion of old data |
 
 ## Modes
 
@@ -28,6 +39,11 @@ Download the latest APK: **Releases → v1.0 → UyirMesh.apk** (Android 8.0 or 
 * **QoS**: SOS > replies/alerts/tasks > chat/reports > voice/photo.
 * **CRC-32** on every hop, **replay window**, per-source **rate limit**, relays drop **forged** base messages.
 * Path trace: each relay appends its short ID, so the base sees the route.
+* Base beacon every 10 minutes (signed): every phone knows how many hops away the base is and when it last heard it.
+* Battery-aware relaying (`PowerPolicy`): below 20 % battery a phone stops relaying voice/photo for others, below
+  10 % it relays only SOS, replies and alerts. Its own SOS always goes out.
+* Internet relay (`mesh/Gateway.kt`): a phone that gets internet uploads waiting packets to a small relay server
+  and downloads packets for the mesh. Packets stay encrypted and signed end to end; the server only stores bytes.
 
 ## Security (`core/Crypto.kt`, `core/Keys.kt`, `core/Secure.kt`)
 
@@ -41,6 +57,11 @@ Download the latest APK: **Releases → v1.0 → UyirMesh.apk** (Android 8.0 or 
   a real team member can move a rescuer on the base map; unsigned or wrongly signed positions are ignored.
 * Base key file: private keys protected with a password (PBKDF2 200k + AES-256-GCM). **Never committed.**
 * Phone storage: encrypted with an Android Keystore key. Device IDs are random (no IMEI, no SIM data).
+* Lost or stolen rescuer phone: the base revokes its ID (signed list, repeated every 30 minutes); every phone then
+  rejects messages signed by that ID.
+* Export for officials: cases CSV and PDF report in a password-protected ZIP (WinZip AES-256, opens in 7-Zip or
+  WinRAR) — `core/SecureZip.kt`, checked against a standard AES-ZIP reader.
+* Optional automatic deletion of old messages, logs and finished cases (Settings).
 
 ## AI priority (`ml/train_priority.py`, `core/Priority.kt`)
 
@@ -48,6 +69,12 @@ Random Forest (30 trees, depth 8, 17 features) trained with scikit-learn on 20,0
 labelled by a weighted triage policy, exported to JSON and evaluated on the phone. Each prediction is
 explained with tree-path contributions ("Injured +19", "1 child +4"). Waiting time and repeated
 messages raise the score. Test accuracy 80.1 %, 99.8 % within one class — see `ml/model_report.md`.
+
+Version 2 adds plain rules on top of the model, each shown as its own reason: danger words in the free-text note
+(`core/NoteScan.kt`: "not breathing", "bleeding", "நெஞ்சு வலி"..., negation aware, at most +15) and animals (at most +4).
+Warning flags (many SOS from one phone, no GPS, impossible position jump, wrong clock, repeated cancels) are shown
+to the dispatcher but never lower a score. Dispatch uses the Hungarian method to give waiting cases to teams with
+free places (`core/Dispatch.kt`), and ETAs learn from finished rescues (median pace blended with the set speed).
 
 ## Live tracking and maps (`core/Tracking.kt`)
 
@@ -93,5 +120,9 @@ the mesh logic behaves, not real radio ranges.
 * Android 8.0+ with Google Play services (Nearby Connections). No iPhone.
 * Radio range between two phones is about 30–100 m depending on walls; more phones = more range.
 * After a phone restart, open the app once so voice SOS and GPS can run in the background (Android rule).
-* Voice SOS is English "help help" and may miss words in very loud places.
+* Voice SOS is English "help help" and may miss words in very loud places. Filling the form by voice also
+  understands English only (offline model).
+* Hindi, Telugu, Malayalam and Kannada cover the SOS screens; other screens fall back to English.
+* Sensor boxes cannot sign their readings, so they are shown as unverified. The ESP32 program in `hardware/` has not
+  been tested on real hardware.
 * SMS and 112 buttons open the phone/SMS apps and need mobile signal; the mesh itself never uses SMS.
